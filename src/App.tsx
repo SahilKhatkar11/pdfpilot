@@ -7,11 +7,11 @@ import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 import { 
   FileUp, FileDown, Scissors, Loader2, CheckCircle2, 
-  AlertCircle, AlertTriangle, X, Sun, Moon, Sparkles, Menu, Home, 
+  AlertCircle, X, Sun, Moon, Sparkles, Menu, Home, 
   Layers, Lock, Unlock, Hash, ArrowUpDown, ExternalLink, 
   Type, ChevronRight, Download, Trash2, MoveUp, MoveDown,
   PlaneTakeoff, Eye, EyeOff, Check, FileText, GripVertical,
-  Image as ImageIcon, Plus
+  ImageIcon, Plus
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import * as pdfjs from 'pdfjs-dist';
@@ -103,7 +103,6 @@ export default function App() {
   const [results, setResults] = useState<SplitResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isIsolated, setIsIsolated] = useState(true);
   
   // Tool-specific states
   const [pagesPerSplit, setPagesPerSplit] = useState<number>(10);
@@ -301,14 +300,6 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
-
-  useEffect(() => {
-    // Check for cross-origin isolation
-    if (typeof window !== 'undefined') {
-      setIsIsolated(!!window.crossOriginIsolated);
-      console.log("Cross-Origin Isolated:", window.crossOriginIsolated);
-    }
-  }, []);
 
   useEffect(() => {
     if (activeTool === 'organize' && files.length > 0 && pdfPages.length === 0) {
@@ -648,40 +639,8 @@ export default function App() {
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
         newResults.push({ name: `images_to_pdf.pdf`, blob, url: URL.createObjectURL(blob), pageRange: `${files.length} images` });
       } else if (activeTool === 'protect' || activeTool === 'unlock') {
-        // These use QPDF and are handled separately due to WASM complexity
-        // I'll keep the existing logic for these
-        const file = files[0].file;
-        const arrayBuffer = await file.arrayBuffer();
-        const initQPDF = (await import('qpdf-wasm')).default;
-        // @ts-ignore
-        const qpdfWasmUrl = (await import('qpdf-wasm/qpdf.wasm?url')).default;
-        const Module = await initQPDF({
-          locateFile: (path: string) => path.endsWith('.wasm') ? qpdfWasmUrl : path,
-        });
-        await new Promise((resolve) => {
-          if (Module.calledRun) resolve(true);
-          else Module.onRuntimeInitialized = resolve;
-        });
-        Module.FS.writeFile('input.pdf', new Uint8Array(arrayBuffer));
-        const args = activeTool === 'unlock' 
-          ? [`--password=${password}`, '--decrypt', 'input.pdf', 'output.pdf']
-          : ['--encrypt', password, password, '256', '--', 'input.pdf', 'output.pdf'];
-        
-        try {
-          Module.callMain(args);
-        } catch (err: any) {
-          if (err.name === 'ExitStatus' && err.status !== 0) {
-            throw new Error(activeTool === 'unlock' ? 'Incorrect password.' : 'Encryption failed.');
-          }
-        }
-        const output = Module.FS.readFile('output.pdf');
-        const blob = new Blob([output], { type: 'application/pdf' });
-        newResults.push({ 
-          name: `${activeTool === 'unlock' ? 'unlocked' : 'protected'}_${file.name}`, 
-          blob, 
-          url: URL.createObjectURL(blob), 
-          pageRange: 'All pages' 
-        });
+        // Placeholder for static hosting compatibility
+        throw new Error(`The "${activeTool === 'protect' ? 'Protect' : 'Unlock'}" tool is currently unavailable in this static version. For security reasons, this feature requires a specialized environment not supported by standard static hosting.`);
       } else {
         // Batch processing for other tools
         if (isBatchMode) {
@@ -900,25 +859,6 @@ export default function App() {
                   )}
                 </div>
 
-                {!isIsolated && (activeTool === 'protect' || activeTool === 'unlock') && (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-5 rounded-3xl mb-8 flex items-start gap-4 shadow-sm backdrop-blur-sm"
-                  >
-                    <div className="bg-amber-500/20 p-2.5 rounded-2xl">
-                      <AlertTriangle className="w-6 h-6 shrink-0" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-base">Security Isolation Required</p>
-                      <p className="text-sm opacity-90 mt-1.5 leading-relaxed">
-                        The "Protect" and "Unlock" tools require a secure, isolated environment that is often blocked inside preview panels. 
-                        To use these features, please <strong>open this application in a new tab</strong> using the button in the top right of your screen.
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-
                 <div className={`rounded-3xl md:rounded-[2.5rem] shadow-2xl border overflow-hidden transition-all duration-500 ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-gray-100'}`}>
                       <input 
                         type="file" 
@@ -1046,11 +986,6 @@ export default function App() {
                                 </div>
                               ))
                             )}
-                            {activeTool === 'merge' && files.length < 15 && (
-                              <button onClick={() => fileInputRef.current?.click()} className={`p-4 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2 font-bold ${isDarkMode ? 'border-slate-800 text-slate-500 hover:text-blue-400 hover:border-blue-500' : 'border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-400'}`}>
-                                <FileUp className="w-5 h-5" /> Add more files
-                              </button>
-                            )}
                           </div>
 
                       {/* Tool Controls */}
@@ -1105,46 +1040,6 @@ export default function App() {
                           <div className="space-y-4">
                             <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Page Range (e.g. 1,3,5-8)</label>
                             <input type="text" value={extractRange} onChange={(e) => setExtractRange(e.target.value)} placeholder="1, 3-5, 10" className={`w-full p-4 rounded-2xl border outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'}`} />
-                          </div>
-                        )}
-                        {activeTool === 'protect' && (
-                          <div className="space-y-4">
-                            <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Set Password</label>
-                            <div className="relative">
-                              <input 
-                                type={showPassword ? "text" : "password"} 
-                                value={password} 
-                                onChange={(e) => setPassword(e.target.value)} 
-                                placeholder="Enter password to protect PDF"
-                                className={`w-full p-4 pr-12 rounded-2xl border outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'}`} 
-                              />
-                              <button 
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-500 transition-colors"
-                              >
-                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        {activeTool === 'unlock' && (
-                          <div className="space-y-4">
-                            <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Enter Password</label>
-                            <div className="relative">
-                              <input 
-                                type={showPassword ? "text" : "password"} 
-                                value={password} 
-                                onChange={(e) => setPassword(e.target.value)} 
-                                placeholder="Enter password to unlock PDF"
-                                className={`w-full p-4 pr-12 rounded-2xl border outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'}`} 
-                              />
-                              <button 
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-500 transition-colors"
-                              >
-                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                              </button>
-                            </div>
                           </div>
                         )}
                         {activeTool === 'number' && (
@@ -1278,6 +1173,48 @@ export default function App() {
                         )}
                         {activeTool === 'extractText' && (
                           <p className="text-sm font-bold text-slate-500">Extract all text content from the PDF for viewing and downloading.</p>
+                        )}
+                        {activeTool === 'protect' && (
+                          <div className="space-y-4">
+                            <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Set Password (Coming Soon)</label>
+                            <div className="relative">
+                              <input 
+                                type={showPassword ? "text" : "password"} 
+                                value={password} 
+                                onChange={(e) => setPassword(e.target.value)} 
+                                placeholder="Enter password to protect PDF"
+                                className={`w-full p-4 pr-12 rounded-2xl border outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'}`} 
+                              />
+                              <button 
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-500 transition-colors"
+                              >
+                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                              </button>
+                            </div>
+                            <p className="text-xs text-amber-500 font-medium">Note: This feature is currently a placeholder for static hosting compatibility.</p>
+                          </div>
+                        )}
+                        {activeTool === 'unlock' && (
+                          <div className="space-y-4">
+                            <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Enter Password (Coming Soon)</label>
+                            <div className="relative">
+                              <input 
+                                type={showPassword ? "text" : "password"} 
+                                value={password} 
+                                onChange={(e) => setPassword(e.target.value)} 
+                                placeholder="Enter password to unlock PDF"
+                                className={`w-full p-4 pr-12 rounded-2xl border outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'}`} 
+                              />
+                              <button 
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-500 transition-colors"
+                              >
+                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                              </button>
+                            </div>
+                            <p className="text-xs text-amber-500 font-medium">Note: This feature is currently a placeholder for static hosting compatibility.</p>
+                          </div>
                         )}
                         {activeTool === 'pdf2img' && (
                           <p className="text-sm font-bold text-slate-500">Each page will be converted into a separate PNG image.</p>
