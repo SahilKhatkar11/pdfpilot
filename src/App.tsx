@@ -66,28 +66,17 @@ interface SplitResult {
 const Logo = ({ isDarkMode, className = "" }: { isDarkMode: boolean; className?: string }) => (
   <div className={`flex items-center gap-3 group ${className}`}>
     <div className="relative">
-      <motion.div 
-        animate={{ 
-          y: [0, -4, 0],
-          rotate: [0, 5, -5, 0]
-        }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center"
-      >
+      <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center">
         <div className="relative">
           <PlaneTakeoff className="w-7 h-7 text-white" />
           <div className="absolute -bottom-1 -right-1 bg-white rounded-md p-0.5 shadow-sm">
             <FileText className="w-3 h-3 text-blue-600" />
           </div>
         </div>
-      </motion.div>
-      <motion.div 
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="absolute -top-1.5 -right-1.5"
-      >
+      </div>
+      <div className="absolute -top-1.5 -right-1.5">
         <Sparkles className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-      </motion.div>
+      </div>
     </div>
     <span className={`text-2xl font-black tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
       PDF<span className="text-blue-600">Pilot</span>
@@ -216,60 +205,31 @@ export default function App() {
       
       {/* Animated liquid-like blobs */}
       <div className="absolute inset-0 opacity-60">
-        {[...Array(6)].map((_, i) => {
+        {[...Array(4)].map((_, i) => {
           const colors = isDarkMode 
             ? [
                 'bg-blue-900/30', 
                 'bg-indigo-900/20', 
                 'bg-purple-900/20', 
-                'bg-slate-900/30', 
-                'bg-cyan-900/20',
-                'bg-blue-800/10'
+                'bg-slate-900/30'
               ] 
             : [
                 'bg-blue-200/40', 
                 'bg-indigo-100/50', 
                 'bg-purple-100/40', 
-                'bg-sky-100/50', 
-                'bg-cyan-100/40',
-                'bg-blue-50/60'
+                'bg-sky-100/50'
               ];
           const color = colors[i % colors.length];
           
           return (
-            <motion.div
+            <div
               key={i}
-              initial={{ 
-                x: (i % 2 === 0 ? -100 : 100), 
-                y: (i < 3 ? -100 : 100),
-                scale: 1,
-                rotate: 0
-              }}
-              animate={{ 
-                x: [
-                  (i % 2 === 0 ? -100 : 100), 
-                  (i % 2 === 0 ? 100 : -100), 
-                  (i % 2 === 0 ? -100 : 100)
-                ],
-                y: [
-                  (i < 3 ? -100 : 100), 
-                  (i < 3 ? 100 : -100), 
-                  (i < 3 ? -100 : 100)
-                ],
-                scale: [1, 1.3, 0.9, 1.1, 1],
-                rotate: [0, 90, 180, 270, 360],
-              }}
-              transition={{
-                duration: 20 + i * 4,
-                repeat: Infinity,
-                ease: "easeInOut",
-                times: [0, 0.25, 0.5, 0.75, 1]
-              }}
               className={`absolute w-[120vw] h-[120vh] rounded-[45%] mix-blend-multiply dark:mix-blend-screen transition-colors duration-1000 ${color}`}
               style={{
                 filter: 'blur(120px)',
                 left: `${(i % 3) * 20 - 10}%`,
                 top: `${Math.floor(i / 3) * 30 - 10}%`,
+                transform: `translate(${(i % 2 === 0 ? -100 : 100)}px, ${(i < 3 ? -100 : 100)}px)`,
                 zIndex: -10 + i
               }}
             />
@@ -1507,9 +1467,9 @@ export default function App() {
             : 'bg-gradient-to-r from-slate-50 via-blue-50 to-slate-50 border-t border-blue-100'
         }`}
       >
-        {/* Sparkling particles on hover - More dominant and colorful */}
+        {/* Sparkling particles on hover - Reduced count and removed continuous animation */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {[...Array(60)].map((_, i) => {
+          {[...Array(20)].map((_, i) => {
             const colors = isDarkMode 
               ? ['bg-blue-400', 'bg-purple-400', 'bg-pink-400', 'bg-yellow-400', 'bg-cyan-400', 'bg-emerald-400', 'bg-orange-400'] 
               : ['bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-orange-500'];
@@ -1521,15 +1481,13 @@ export default function App() {
                 key={i}
                 variants={{
                   hover: {
-                    opacity: [0, 1, 0.8, 0],
-                    scale: [0, 1.8, 2.5, 0],
-                    x: [0, (Math.random() - 0.5) * 1400],
-                    y: [0, (Math.random() - 0.5) * 500],
-                    rotate: [0, 720],
+                    opacity: [0, 1, 0],
+                    scale: [0, 1.5, 0],
+                    x: [0, (Math.random() - 0.5) * 1000],
+                    y: [0, (Math.random() - 0.5) * 400],
                     transition: {
-                      duration: Math.random() * 2.5 + 1,
-                      repeat: Infinity,
-                      delay: Math.random() * 1.5,
+                      duration: Math.random() * 1.5 + 0.5,
+                      delay: Math.random() * 0.5,
                       ease: "easeOut"
                     }
                   }
@@ -1561,12 +1519,7 @@ export default function App() {
                 ? 'bg-slate-900/80 border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.2)] backdrop-blur-md' 
                 : 'bg-white/80 border-blue-200 shadow-[0_0_30px_rgba(59,130,246,0.1)] backdrop-blur-md'
             }`}>
-              <motion.div
-                animate={{ rotate: [0, 15, -15, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <Sparkles className={`w-5 h-5 md:w-6 md:h-6 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
-              </motion.div>
+              <Sparkles className={`w-5 h-5 md:w-6 md:h-6 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
               
               <p className={`text-sm md:text-xl font-medium tracking-tight ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                 Developed by{' '}
@@ -1585,12 +1538,7 @@ export default function App() {
                 </a>
               </p>
 
-              <motion.div
-                animate={{ rotate: [0, -15, 15, 0] }}
-                transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-              >
-                <Sparkles className={`w-5 h-5 md:w-6 md:h-6 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
-              </motion.div>
+              <Sparkles className={`w-5 h-5 md:w-6 md:h-6 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
             </div>
           </motion.div>
         </div>
