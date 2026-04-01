@@ -747,7 +747,7 @@ export default function App() {
 
           <main>
             {!activeTool ? (
-              <div className="space-y-10 md:space-y-16 py-6 md:py-10">
+              <div className="space-y-6 md:space-y-10 py-6 md:py-10">
                 <div className="text-center space-y-4 md:space-y-6">
                   <motion.h2 
                     initial={{ opacity: 0, y: 20 }}
@@ -768,7 +768,7 @@ export default function App() {
                 </div>
 
                 {/* Features Section */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-12 md:mb-16">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
                   {[
                     { title: 'Privacy First', icon: Lock },
                     { title: 'Local Processing', icon: Home },
@@ -803,7 +803,7 @@ export default function App() {
                         className={`absolute w-[200%] h-[200%] pointer-events-none z-20 -rotate-45 ${
                           isDarkMode 
                             ? 'bg-gradient-to-r from-transparent via-white/10 to-transparent' 
-                            : 'bg-gradient-to-r from-transparent via-white/60 to-transparent'
+                            : 'bg-gradient-to-r from-transparent via-blue-400/20 to-transparent'
                         }`}
                       />
                     </motion.div>
@@ -811,8 +811,8 @@ export default function App() {
                 </div>
 
                 {/* Tools Quick List */}
-                <div className="mb-5 md:mb-6">
-                  <div className="flex items-center gap-3 mb-5">
+                <div className="mb-10 md:mb-12">
+                  <div className="flex items-center gap-3 mb-8">
                     <div className={`h-px flex-grow ${isDarkMode ? 'bg-slate-800' : 'bg-gray-100'}`} />
                     <h4 className={`text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>
                       List of tools we offer
@@ -847,7 +847,7 @@ export default function App() {
                       </motion.button>
                     ))}
                   </div>
-                  <div className="flex items-center gap-3 mt-4">
+                  <div className="flex items-center gap-3 mt-8">
                     <div className={`h-px flex-grow ${isDarkMode ? 'bg-slate-800' : 'bg-gray-100'}`} />
                     <div className={`w-1.5 h-1.5 rounded-full ${isDarkMode ? 'bg-slate-800' : 'bg-gray-200'}`} />
                     <div className={`h-px flex-grow ${isDarkMode ? 'bg-slate-800' : 'bg-gray-100'}`} />
