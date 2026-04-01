@@ -37,22 +37,22 @@ interface Tool {
 }
 
 const TOOLS: Tool[] = [
-  { id: 'img2pdf', name: 'Images to PDF', description: 'Convert images (JPG, PNG) into a PDF file.', icon: FileUp, color: 'bg-emerald-500' },
-  { id: 'pdf2img', name: 'PDF to Images', description: 'Convert PDF pages into high-quality images.', icon: Eye, color: 'bg-amber-500' },
-  { id: 'split', name: 'Split PDF', description: 'Split a PDF into multiple files by page range.', icon: Scissors, color: 'bg-blue-500' },
-  { id: 'merge', name: 'Merge PDF', description: 'Combine multiple PDF files into one (max 15).', icon: Layers, color: 'bg-indigo-500' },
-  { id: 'rotate', name: 'Rotate Pages', description: 'Rotate PDF pages by 90, 180, or 270 degrees.', icon: ArrowUpDown, color: 'bg-orange-600' },
-  { id: 'duplicate', name: 'Duplicate Pages', description: 'Duplicate the first page multiple times.', icon: Layers, color: 'bg-teal-500' },
-  { id: 'blank', name: 'Add Blank Pages', description: 'Insert empty pages into your PDF.', icon: FileText, color: 'bg-slate-500' },
-  { id: 'reverse', name: 'Reverse PDF', description: 'Reverse the page order of your PDF.', icon: MoveUp, color: 'bg-rose-500' },
-  { id: 'draw', name: 'Draw / Sign', description: 'Draw or add a signature to your PDF.', icon: Type, color: 'bg-violet-500' },
-  { id: 'extractText', name: 'Extract Text', description: 'Extract all selectable text from your PDF.', icon: FileText, color: 'bg-lime-500' },
-  { id: 'protect', name: 'Protect PDF', description: 'Add password protection to your PDF.', icon: Lock, color: 'bg-red-500' },
-  { id: 'unlock', name: 'Unlock PDF', description: 'Remove password protection from your PDF.', icon: Unlock, color: 'bg-green-500' },
-  { id: 'number', name: 'Page Numbers', description: 'Add page numbers to your PDF document.', icon: Hash, color: 'bg-purple-500' },
-  { id: 'organize', name: 'Organize PDF', description: 'Rearrange or delete pages in your PDF.', icon: ArrowUpDown, color: 'bg-orange-500' },
-  { id: 'extract', name: 'Extract Pages', description: 'Extract specific pages from your PDF.', icon: ExternalLink, color: 'bg-cyan-500' },
-  { id: 'watermark', name: 'Watermark', description: 'Add a text watermark to your PDF pages.', icon: Type, color: 'bg-pink-500' },
+  { id: 'img2pdf', name: 'Images to PDF', description: 'Convert your JPG, PNG, and other image formats into a single, high-quality PDF document instantly.', icon: FileUp, color: 'bg-emerald-500' },
+  { id: 'pdf2img', name: 'PDF to Images', description: 'Transform any PDF page into a high-resolution image file, perfect for sharing or embedding in other documents.', icon: Eye, color: 'bg-amber-500' },
+  { id: 'split', name: 'Split PDF', description: 'Divide your PDF files into separate documents by selecting specific page ranges or extracting individual pages.', icon: Scissors, color: 'bg-blue-500' },
+  { id: 'merge', name: 'Merge PDF', description: 'Combine multiple PDF files into one organized document with support for up to 15 files at once.', icon: Layers, color: 'bg-indigo-500' },
+  { id: 'rotate', name: 'Rotate Pages', description: 'Fix the orientation of your PDF pages by rotating them 90, 180, or 270 degrees with a single click.', icon: ArrowUpDown, color: 'bg-orange-600' },
+  { id: 'duplicate', name: 'Duplicate Pages', description: 'Easily duplicate any page within your PDF document multiple times to create templates or repetitive forms.', icon: Layers, color: 'bg-teal-500' },
+  { id: 'blank', name: 'Add Blank Pages', description: 'Insert clean, empty pages anywhere in your PDF to provide extra space for notes or future content.', icon: FileText, color: 'bg-slate-500' },
+  { id: 'reverse', name: 'Reverse PDF', description: 'Flip the entire page order of your PDF document from back to front with this quick and efficient tool.', icon: MoveUp, color: 'bg-rose-500' },
+  { id: 'draw', name: 'Draw / Sign', description: 'Add your personal signature or freehand drawings directly onto any page of your PDF document.', icon: Type, color: 'bg-violet-500' },
+  { id: 'extractText', name: 'Extract Text', description: 'Quickly pull all selectable text from your PDF files for easy editing, searching, or repurposing elsewhere.', icon: FileText, color: 'bg-lime-500' },
+  { id: 'protect', name: 'Protect PDF', description: 'Secure your sensitive documents by adding strong password protection to prevent unauthorized access.', icon: Lock, color: 'bg-red-500' },
+  { id: 'unlock', name: 'Unlock PDF', description: 'Remove existing password protection from your PDF files if you have the right permissions to access them.', icon: Unlock, color: 'bg-green-500' },
+  { id: 'number', name: 'Page Numbers', description: 'Automatically add professional page numbers to your PDF with customizable positions and formatting styles.', icon: Hash, color: 'bg-purple-500' },
+  { id: 'organize', name: 'Organize PDF', description: 'Take full control of your PDF structure by rearranging, deleting, or reordering pages exactly how you need.', icon: ArrowUpDown, color: 'bg-orange-500' },
+  { id: 'extract', name: 'Extract Pages', description: 'Select and extract specific pages from a large PDF to create a new, focused document with just the content you need.', icon: ExternalLink, color: 'bg-cyan-500' },
+  { id: 'watermark', name: 'Watermark', description: 'Protect your intellectual property by adding custom text watermarks across all pages of your PDF document.', icon: Type, color: 'bg-pink-500' },
 ];
 
 interface SplitResult {
@@ -119,6 +119,9 @@ export default function App() {
   const [strokes, setStrokes] = useState<{ points: { x: number; y: number }[] }[]>([]);
   const [currentStroke, setCurrentStroke] = useState<{ x: number; y: number }[] | null>(null);
   const [openDropdownIdx, setOpenDropdownIdx] = useState<number | null>(null);
+
+  const [featureClickCounts, setFeatureClickCounts] = useState([0, 0, 0, 0]);
+  const [highlightedTool, setHighlightedTool] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -764,23 +767,124 @@ export default function App() {
                   </motion.p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                {/* Features Section */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-12 md:mb-16">
+                  {[
+                    { title: 'Privacy First', icon: Lock },
+                    { title: 'Local Processing', icon: Home },
+                    { title: 'No File Limits', icon: Layers },
+                    { title: 'Fast & Free', icon: Sparkles }
+                  ].map((feature, i) => (
+                    <motion.div
+                      key={i}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        const newCounts = [...featureClickCounts];
+                        newCounts[i]++;
+                        setFeatureClickCounts(newCounts);
+                      }}
+                      className={`p-4 md:p-5 rounded-2xl border flex flex-col items-center justify-center gap-2 text-center transition-all cursor-pointer relative overflow-hidden ${
+                        isDarkMode 
+                          ? 'bg-slate-900/40 border-slate-800 text-slate-300' 
+                          : 'bg-white border-gray-100 text-slate-600 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center justify-center gap-2 relative z-10">
+                        <feature.icon className={`w-5 h-5 ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} />
+                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider">{feature.title}</span>
+                      </div>
+                      
+                      {/* Shiny Polish Effect - One-way Diagonal */}
+                      <motion.div
+                        key={featureClickCounts[i]}
+                        initial={{ left: '-150%', top: '150%' }}
+                        animate={featureClickCounts[i] > 0 ? { left: '150%', top: '-150%' } : {}}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className={`absolute w-[200%] h-[200%] pointer-events-none z-20 -rotate-45 ${
+                          isDarkMode 
+                            ? 'bg-gradient-to-r from-transparent via-white/10 to-transparent' 
+                            : 'bg-gradient-to-r from-transparent via-white/60 to-transparent'
+                        }`}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Tools Quick List */}
+                <div className="mb-5 md:mb-6">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className={`h-px flex-grow ${isDarkMode ? 'bg-slate-800' : 'bg-gray-100'}`} />
+                    <h4 className={`text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] whitespace-nowrap ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                      List of tools we offer
+                    </h4>
+                    <div className={`h-px flex-grow ${isDarkMode ? 'bg-slate-800' : 'bg-gray-100'}`} />
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+                    {TOOLS.map((tool) => (
+                      <motion.button
+                        key={tool.id}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          // Scroll to the specific tool card first
+                          const element = document.getElementById(`tool-card-${tool.id}`);
+                          if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            
+                            // Trigger the glow effect after the scroll has started/finished
+                            setTimeout(() => {
+                              setHighlightedTool(tool.id);
+                              setTimeout(() => setHighlightedTool(null), 800);
+                            }, 500);
+                          }
+                        }}
+                        className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl border text-[9px] md:text-[11px] font-bold transition-all ${
+                          isDarkMode 
+                            ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-blue-400 hover:border-blue-500/40' 
+                            : 'bg-white border-gray-100 text-slate-500 hover:text-blue-600 hover:border-blue-200 shadow-sm'
+                        }`}
+                      >
+                        {tool.name}
+                      </motion.button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3 mt-4">
+                    <div className={`h-px flex-grow ${isDarkMode ? 'bg-slate-800' : 'bg-gray-100'}`} />
+                    <div className={`w-1.5 h-1.5 rounded-full ${isDarkMode ? 'bg-slate-800' : 'bg-gray-200'}`} />
+                    <div className={`h-px flex-grow ${isDarkMode ? 'bg-slate-800' : 'bg-gray-100'}`} />
+                  </div>
+                </div>
+
+                <div id="tools-grid" className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                   {TOOLS.map((tool, idx) => (
                     <motion.button
                       key={tool.id}
+                      id={`tool-card-${tool.id}`}
                       initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 * idx }}
+                      animate={{ 
+                        opacity: 1, 
+                        y: 0,
+                        boxShadow: highlightedTool === tool.id 
+                          ? (isDarkMode ? '0 0 40px rgba(59, 130, 246, 0.6)' : '0 0 30px rgba(59, 130, 246, 0.4)') 
+                          : 'none'
+                      }}
+                      transition={{ 
+                        delay: highlightedTool === tool.id ? 0 : 0.1 * idx,
+                        boxShadow: { duration: 0.3 }
+                      }}
                       onClick={() => setActiveTool(tool.id)}
-                      className={`group p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border text-left transition-all duration-500 hover:scale-[1.02] ${isDarkMode ? 'bg-slate-900/50 border-slate-800 hover:border-blue-500/50' : 'bg-white border-gray-100 hover:border-blue-200 shadow-sm hover:shadow-xl'}`}
+                      className={`group p-4 pb-2 md:p-6 md:pb-4 rounded-2xl md:rounded-[2rem] border text-left transition-all duration-500 ${
+                        highlightedTool === tool.id 
+                          ? (isDarkMode ? 'border-blue-500 bg-slate-800/80' : 'border-blue-400 bg-blue-50/30')
+                          : (isDarkMode ? 'bg-slate-900/50 border-slate-800 hover:border-blue-500/50' : 'bg-white border-gray-100 hover:border-blue-200 shadow-sm hover:shadow-xl')
+                      } hover:scale-[1.02]`}
                     >
-                      <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center mb-4 md:mb-6 transition-transform group-hover:scale-110 group-hover:rotate-3 ${tool.color} shadow-lg shadow-current/20`}>
-                        <tool.icon className="w-6 h-6 md:w-7 md:h-7 text-white" />
+                      <div className={`w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center mb-3 md:mb-6 transition-transform group-hover:scale-110 group-hover:rotate-3 ${tool.color} shadow-lg shadow-current/20`}>
+                        <tool.icon className="w-5 h-5 md:w-7 md:h-7 text-white" />
                       </div>
-                      <h3 className={`text-lg md:text-xl font-bold mb-1 md:mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{tool.name}</h3>
-                      <p className={`text-xs md:text-sm leading-relaxed ${isDarkMode ? 'text-slate-500' : 'text-gray-500'}`}>{tool.description}</p>
-                      <div className="mt-4 md:mt-6 flex items-center gap-2 text-blue-600 font-bold text-xs md:text-sm opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        Get Started <ChevronRight className="w-4 h-4" />
+                      <h3 className={`text-sm md:text-xl font-bold mb-1 md:mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{tool.name}</h3>
+                      <p className={`text-[10px] md:text-sm leading-relaxed ${isDarkMode ? 'text-slate-500' : 'text-gray-500'}`}>{tool.description}</p>
+                      <div className="mt-1 md:mt-2 hidden md:flex items-center gap-2 text-blue-600 font-bold text-[10px] md:text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                        Get Started <ChevronRight className="w-3 h-3 md:w-4 md:h-4" />
                       </div>
                     </motion.button>
                   ))}
@@ -1450,7 +1554,7 @@ export default function App() {
           </main>
 
           {/* Footer Info */}
-          <footer className={`mt-16 pt-8 border-t text-center text-sm transition-colors duration-300 ${
+          <footer className={`mt-8 pt-8 border-t text-center text-sm transition-colors duration-300 ${
             isDarkMode ? 'border-slate-800 text-slate-500' : 'border-gray-100 text-gray-400'
           }`}>
             <p>Your files are processed locally in your browser and are never uploaded to any server.</p>
@@ -1461,6 +1565,7 @@ export default function App() {
       {/* Developer Credit Footer */}
       <motion.footer 
         whileHover="hover"
+        whileTap="hover"
         className={`w-full py-12 mt-auto relative overflow-hidden transition-all duration-500 ${
           isDarkMode 
             ? 'bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 border-t border-slate-800' 
