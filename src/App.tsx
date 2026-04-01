@@ -63,8 +63,11 @@ interface SplitResult {
   text?: string; // For extract text
 }
 
-const Logo = ({ isDarkMode, className = "" }: { isDarkMode: boolean; className?: string }) => (
-  <div className={`flex items-center gap-3 group ${className}`}>
+const Logo = ({ isDarkMode, className = "", onClick }: { isDarkMode: boolean; className?: string; onClick?: () => void }) => (
+  <div 
+    onClick={onClick}
+    className={`flex items-center gap-3 group cursor-pointer ${className}`}
+  >
     <div className="relative">
       <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center">
         <div className="relative">
@@ -715,26 +718,32 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <div className="flex-grow p-4 md:p-8 relative z-10">
-        <div className="max-w-5xl mx-auto">
-          {/* Header */}
-          <header className="mb-8 md:mb-12 flex items-center justify-between">
+      <div className="flex-grow relative z-10 flex flex-col">
+        {/* Sticky Header */}
+        <header className={`sticky top-0 z-30 w-full transition-all duration-300 ${
+          isDarkMode ? 'bg-[#0c142e]/85 border-blue-900/20' : 'bg-blue-50/80 border-blue-100/50'
+        } backdrop-blur-md border-b`}>
+          <div className="max-w-5xl mx-auto px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
             <div className="flex items-center gap-3 md:gap-4">
               {activeTool && (
                 <button 
                   onClick={() => setIsMenuOpen(true)}
-                  className={`p-2.5 md:p-3 rounded-2xl transition-all shadow-lg ${isDarkMode ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-gray-900 hover:bg-gray-50'}`}
+                  className={`p-2 md:p-2.5 rounded-xl transition-all shadow-lg ${isDarkMode ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-gray-900 hover:bg-gray-50'}`}
                 >
                   <Menu className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
               )}
-              <Logo isDarkMode={isDarkMode} className="scale-90 md:scale-100 origin-left" />
+              <Logo 
+                isDarkMode={isDarkMode} 
+                className="scale-85 md:scale-100 origin-left" 
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              />
             </div>
 
             {!activeTool && (
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
-                className={`p-3 rounded-2xl transition-all duration-300 shadow-lg ${
+                className={`p-2.5 rounded-xl transition-all duration-300 shadow-lg ${
                   isDarkMode 
                     ? 'bg-slate-800 text-yellow-400 shadow-slate-900/50 hover:bg-slate-700' 
                     : 'bg-white text-slate-600 shadow-slate-200 hover:bg-slate-50'
@@ -743,9 +752,12 @@ export default function App() {
                 {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
             )}
-          </header>
+          </div>
+        </header>
 
-          <main>
+        <div className="flex-grow p-4 md:p-8">
+          <div className="max-w-5xl mx-auto">
+            <main>
             {!activeTool ? (
               <div className="space-y-6 md:space-y-10 py-6 md:py-10">
                 <div className="text-center space-y-4 md:space-y-6">
@@ -799,7 +811,7 @@ export default function App() {
                         key={featureClickCounts[i]}
                         initial={{ left: '-150%', top: '150%' }}
                         animate={featureClickCounts[i] > 0 ? { left: '150%', top: '-150%' } : {}}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
                         className={`absolute w-[200%] h-[200%] pointer-events-none z-20 -rotate-45 ${
                           isDarkMode 
                             ? 'bg-gradient-to-r from-transparent via-white/10 to-transparent' 
@@ -1566,20 +1578,20 @@ export default function App() {
       <motion.footer 
         whileHover="hover"
         whileTap="hover"
-        className={`w-full py-12 mt-auto relative overflow-hidden transition-all duration-500 ${
+        className={`w-full py-6 mt-auto relative overflow-hidden transition-all duration-500 ${
           isDarkMode 
-            ? 'bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 border-t border-slate-800' 
-            : 'bg-gradient-to-r from-slate-50 via-blue-50 to-slate-50 border-t border-blue-100'
-        }`}
+            ? 'bg-[#0c142e]/85 border-t border-blue-900/20' 
+            : 'bg-blue-50/80 border-t border-blue-100/50'
+        } backdrop-blur-md`}
       >
-        {/* Sparkling particles on hover - Reduced count and removed continuous animation */}
+        {/* Sparkling particles on hover - Increased count and intensity */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {[...Array(20)].map((_, i) => {
+          {[...Array(45)].map((_, i) => {
             const colors = isDarkMode 
               ? ['bg-blue-400', 'bg-purple-400', 'bg-pink-400', 'bg-yellow-400', 'bg-cyan-400', 'bg-emerald-400', 'bg-orange-400'] 
               : ['bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-orange-500'];
             const color = colors[i % colors.length];
-            const size = Math.random() * 6 + 2; // 2px to 8px
+            const size = Math.random() * 8 + 3; // 3px to 11px (increased size)
             
             return (
               <motion.div
@@ -1649,5 +1661,6 @@ export default function App() {
         </div>
       </motion.footer>
     </div>
+  </div>
   );
 }
