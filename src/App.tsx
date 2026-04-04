@@ -4,14 +4,14 @@
  */
 
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
-import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts, degrees, PDFName } from 'pdf-lib';
 import { 
   FileUp, FileDown, Scissors, Loader2, CheckCircle2, 
   AlertCircle, X, Sun, Moon, Sparkles, Menu, Home, 
   Layers, Lock, Unlock, Hash, ArrowUpDown, ExternalLink, 
   Type, ChevronRight, Download, Trash2, MoveUp, MoveDown,
   PlaneTakeoff, Eye, EyeOff, Check, FileText, GripVertical,
-  ImageIcon, Plus
+  ImageIcon, Plus, Info, ShieldCheck, Droplets, Maximize
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import * as pdfjs from 'pdfjs-dist';
@@ -21,7 +21,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 // Set up PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-type ToolType = 'split' | 'merge' | 'protect' | 'unlock' | 'number' | 'organize' | 'extract' | 'watermark' | 'rotate' | 'duplicate' | 'blank' | 'reverse' | 'pdf2img' | 'img2pdf' | 'draw' | 'extractText';
+type ToolType = 'split' | 'merge' | 'protect' | 'unlock' | 'number' | 'organize' | 'extract' | 'watermark' | 'rotate' | 'duplicate' | 'blank' | 'reverse' | 'pdf2img' | 'img2pdf' | 'draw' | 'extractText' | 'metadata' | 'grayscale' | 'flatten' | 'sanitize';
 
 interface PDFFile {
   id: string;
@@ -53,6 +53,10 @@ const TOOLS: Tool[] = [
   { id: 'organize', name: 'Organize PDF', description: 'Take full control of your PDF structure by rearranging, deleting, or reordering pages exactly how you need.', icon: ArrowUpDown, color: 'bg-orange-500' },
   { id: 'extract', name: 'Extract Pages', description: 'Select and extract specific pages from a large PDF to create a new, focused document with just the content you need.', icon: ExternalLink, color: 'bg-cyan-500' },
   { id: 'watermark', name: 'Watermark', description: 'Protect your intellectual property by adding custom text watermarks across all pages of your PDF document.', icon: Type, color: 'bg-pink-500' },
+  { id: 'metadata', name: 'Manage Metadata', description: 'View and edit document properties like Title, Author, Subject, and Creator to keep your files professional and organized.', icon: Info, color: 'bg-indigo-600' },
+  { id: 'grayscale', name: 'Grayscale PDF', description: 'Convert your full-color PDF into black and white to save printer ink and create a classic look.', icon: Droplets, color: 'bg-gray-600' },
+  { id: 'flatten', name: 'Flatten PDF', description: 'Make interactive forms and annotations permanent so they can no longer be edited or changed by others.', icon: Maximize, color: 'bg-orange-700' },
+  { id: 'sanitize', name: 'Sanitize PDF', description: 'Remove hidden sensitive data like undo history, hidden layers, and metadata before sharing your documents.', icon: ShieldCheck, color: 'bg-teal-600' },
 ];
 
 interface SplitResult {
@@ -60,6 +64,8 @@ interface SplitResult {
   blob: Blob;
   url: string;
   pageRange: string;
+  size: number;
+  pageCount: number;
   text?: string; // For extract text
 }
 
@@ -109,6 +115,15 @@ export default function App() {
   const [numberFormat, setNumberFormat] = useState<'simple' | 'fraction' | 'full'>('fraction');
   
   // New tool states
+  const [imgResolution, setImgResolution] = useState<150 | 300>(150);
+  const [imgFormat, setImgFormat] = useState<'image/jpeg' | 'image/png' | 'image/webp'>('image/png');
+  const [filePageCounts, setFilePageCounts] = useState<Record<string, number>>({});
+  
+  const [metadataTitle, setMetadataTitle] = useState('');
+  const [metadataAuthor, setMetadataAuthor] = useState('');
+  const [metadataSubject, setMetadataSubject] = useState('');
+  const [metadataCreator, setMetadataCreator] = useState('');
+
   const [rotationAngle, setRotationAngle] = useState<0 | 90 | 180 | 270>(90);
   const [duplicateCount, setDuplicateCount] = useState<number>(1);
   const [duplicatePageNum, setDuplicatePageNum] = useState<number>(1);
@@ -288,6 +303,20 @@ export default function App() {
         return;
       }
       const newFiles = validFiles.map(f => ({ id: Math.random().toString(36).substring(2, 9) + Date.now(), file: f }));
+      
+      // Detect page counts for PDF files
+      newFiles.forEach(async (f) => {
+        if (f.file.type === 'application/pdf') {
+          try {
+            const arrayBuffer = await f.file.arrayBuffer();
+            const pdfDoc = await PDFDocument.load(arrayBuffer);
+            setFilePageCounts(prev => ({ ...prev, [f.id]: pdfDoc.getPageCount() }));
+          } catch (e) {
+            console.error('Error getting page count:', e);
+          }
+        }
+      });
+
       setFiles(prev => (activeTool === 'merge' || activeTool === 'img2pdf') ? [...prev, ...newFiles] : [newFiles[0]]);
       setResults([]);
       setError(null);
@@ -298,6 +327,11 @@ export default function App() {
       // Load pages for organize tool
       if (activeTool === 'organize' && newFiles[0] && !isImageTool) {
         loadPdfPages(newFiles[0].file);
+      }
+
+      // Load metadata for metadata tool
+      if (activeTool === 'metadata' && newFiles[0] && !isImageTool) {
+        loadMetadata(newFiles[0].file);
       }
     } else if (selectedFiles.length > 0) {
       setError(isImageTool ? 'Please select valid image files (JPG, PNG).' : 'Please select valid PDF files.');
@@ -336,6 +370,20 @@ export default function App() {
     }
   };
 
+  const loadMetadata = async (file: File) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      setMetadataTitle(pdfDoc.getTitle() || '');
+      setMetadataAuthor(pdfDoc.getAuthor() || '');
+      setMetadataSubject(pdfDoc.getSubject() || '');
+      setMetadataCreator(pdfDoc.getCreator() || '');
+    } catch (err) {
+      console.error('Metadata load error:', err);
+      setError('Could not load PDF metadata.');
+    }
+  };
+
   const processPdf = async () => {
     if (files.length === 0) return;
     setIsProcessing(true);
@@ -349,6 +397,10 @@ export default function App() {
         const arrayBuffer = await file.arrayBuffer();
         const pdfDoc = await PDFDocument.load(arrayBuffer);
         const pageCount = pdfDoc.getPageCount();
+
+        // Set default creator and producer
+        pdfDoc.setCreator('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
+        pdfDoc.setProducer('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
 
         if (activeTool === 'split') {
           const pageSize = pagesPerSplit;
@@ -364,7 +416,9 @@ export default function App() {
               name: `${file.name.replace('.pdf', '')}_part_${Math.floor(i / pageSize) + 1}.pdf`,
               blob,
               url: URL.createObjectURL(blob),
-              pageRange: `${i + 1}-${end}`
+              pageRange: `${i + 1}-${end}`,
+              size: blob.size,
+              pageCount: subPdfDoc.getPageCount()
             });
           }
         } else if (activeTool === 'rotate') {
@@ -378,7 +432,14 @@ export default function App() {
           });
           const pdfBytes = await pdfDoc.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          newResults.push({ name: `rotated_${file.name}`, blob, url: URL.createObjectURL(blob), pageRange: selectedPages.length > 0 ? `Selected Pages` : 'All Pages' });
+          newResults.push({ 
+            name: `rotated_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: selectedPages.length > 0 ? `Selected Pages` : 'All Pages',
+            size: blob.size,
+            pageCount: pdfDoc.getPageCount()
+          });
         } else if (activeTool === 'duplicate') {
           // Duplicate specific page multiple times at the end of the document
           const pageIdx = Math.max(0, Math.min(duplicatePageNum - 1, pageCount - 1));
@@ -388,13 +449,27 @@ export default function App() {
           }
           const pdfBytes = await pdfDoc.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          newResults.push({ name: `duplicated_${file.name}`, blob, url: URL.createObjectURL(blob), pageRange: `Page ${pageIdx + 1} x${duplicateCount}` });
+          newResults.push({ 
+            name: `duplicated_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: `Page ${pageIdx + 1} x${duplicateCount}`,
+            size: blob.size,
+            pageCount: pdfDoc.getPageCount()
+          });
         } else if (activeTool === 'blank') {
           const pos = Math.max(0, Math.min(blankPagePos, pageCount));
           pdfDoc.insertPage(pos);
           const pdfBytes = await pdfDoc.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          newResults.push({ name: `blank_added_${file.name}`, blob, url: URL.createObjectURL(blob), pageRange: `Blank at ${pos + 1}` });
+          newResults.push({ 
+            name: `blank_added_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: `Blank at ${pos + 1}`,
+            size: blob.size,
+            pageCount: pdfDoc.getPageCount()
+          });
         } else if (activeTool === 'reverse') {
           const subPdfDoc = await PDFDocument.create();
           const indices = Array.from({ length: pageCount }, (_, i) => pageCount - 1 - i);
@@ -402,27 +477,39 @@ export default function App() {
           copiedPages.forEach(p => subPdfDoc.addPage(p));
           const pdfBytes = await subPdfDoc.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          newResults.push({ name: `reversed_${file.name}`, blob, url: URL.createObjectURL(blob), pageRange: 'Reversed' });
+          newResults.push({ 
+            name: `reversed_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: 'Reversed',
+            size: blob.size,
+            pageCount: subPdfDoc.getPageCount()
+          });
         } else if (activeTool === 'pdf2img') {
           const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) });
           const pdf = await loadingTask.promise;
+          const scale = imgResolution / 72; // Convert DPI to scale (PDF.js default is 72dpi)
+          
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 2.0 });
+            const viewport = page.getViewport({ scale });
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             canvas.height = viewport.height;
             canvas.width = viewport.width;
             if (context) {
               await page.render({ canvasContext: context, viewport, canvas: canvas as any }).promise;
-              const dataUrl = canvas.toDataURL('image/png');
+              const extension = imgFormat.split('/')[1];
+              const dataUrl = canvas.toDataURL(imgFormat, 0.9);
               const res = await fetch(dataUrl);
               const blob = await res.blob();
               newResults.push({
-                name: `${file.name.replace('.pdf', '')}_page_${i}.png`,
+                name: `${file.name.replace('.pdf', '')}_page_${i}.${extension}`,
                 blob,
                 url: dataUrl,
-                pageRange: `Page ${i}`
+                pageRange: `Page ${i}`,
+                size: blob.size,
+                pageCount: 1
               });
             }
           }
@@ -442,7 +529,9 @@ export default function App() {
             blob,
             url: URL.createObjectURL(blob),
             pageRange: 'Text Content',
-            text: fullText
+            text: fullText,
+            size: blob.size,
+            pageCount: pdf.numPages
           });
         } else if (activeTool === 'watermark') {
           const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -461,7 +550,14 @@ export default function App() {
           });
           const pdfBytes = await pdfDoc.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          newResults.push({ name: `watermarked_${file.name}`, blob, url: URL.createObjectURL(blob), pageRange: 'All pages' });
+          newResults.push({ 
+            name: `watermarked_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: 'All pages',
+            size: blob.size,
+            pageCount: pdfDoc.getPageCount()
+          });
         } else if (activeTool === 'number') {
           const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
           const pages = pdfDoc.getPages();
@@ -487,7 +583,14 @@ export default function App() {
           });
           const pdfBytes = await pdfDoc.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          newResults.push({ name: `numbered_${file.name}`, blob, url: URL.createObjectURL(blob), pageRange: 'All pages' });
+          newResults.push({ 
+            name: `numbered_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: 'All pages',
+            size: blob.size,
+            pageCount: pdfDoc.getPageCount()
+          });
         } else if (activeTool === 'extract') {
           const indices = extractRange.split(',').flatMap(r => {
             if (r.includes('-')) {
@@ -500,18 +603,36 @@ export default function App() {
           if (indices.length === 0) throw new Error('Invalid range');
           
           const subPdfDoc = await PDFDocument.create();
+          subPdfDoc.setCreator('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
+          subPdfDoc.setProducer('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
           const copiedPages = await subPdfDoc.copyPages(pdfDoc, indices);
           copiedPages.forEach(p => subPdfDoc.addPage(p));
           const pdfBytes = await subPdfDoc.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          newResults.push({ name: `extracted_${file.name}`, blob, url: URL.createObjectURL(blob), pageRange: extractRange });
+          newResults.push({ 
+            name: `extracted_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: extractRange,
+            size: blob.size,
+            pageCount: subPdfDoc.getPageCount()
+          });
         } else if (activeTool === 'organize') {
           const subPdfDoc = await PDFDocument.create();
+          subPdfDoc.setCreator('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
+          subPdfDoc.setProducer('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
           const copiedPages = await subPdfDoc.copyPages(pdfDoc, pdfPages);
           copiedPages.forEach(p => subPdfDoc.addPage(p));
           const pdfBytes = await subPdfDoc.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          newResults.push({ name: `organized_${file.name}`, blob, url: URL.createObjectURL(blob), pageRange: 'Custom' });
+          newResults.push({ 
+            name: `organized_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: 'Custom',
+            size: blob.size,
+            pageCount: subPdfDoc.getPageCount()
+          });
         } else if (activeTool === 'draw') {
           const pages = pdfDoc.getPages();
           const targetPageIdx = Math.max(0, Math.min(signPageNum - 1, pages.length - 1));
@@ -566,12 +687,117 @@ export default function App() {
           
           const pdfBytes = await pdfDoc.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-          newResults.push({ name: `signed_${file.name}`, blob, url: URL.createObjectURL(blob), pageRange: `Signed Page ${targetPageIdx + 1}` });
+          newResults.push({ 
+            name: `signed_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: `Signed Page ${targetPageIdx + 1}`,
+            size: blob.size,
+            pageCount: pdfDoc.getPageCount()
+          });
+        } else if (activeTool === 'metadata') {
+          pdfDoc.setTitle(metadataTitle);
+          pdfDoc.setAuthor(metadataAuthor);
+          pdfDoc.setSubject(metadataSubject);
+          pdfDoc.setCreator(metadataCreator);
+          const pdfBytes = await pdfDoc.save();
+          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+          newResults.push({ 
+            name: `metadata_updated_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: 'Metadata Updated',
+            size: blob.size,
+            pageCount: pdfDoc.getPageCount()
+          });
+        } else if (activeTool === 'grayscale') {
+          const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) });
+          const pdf = await loadingTask.promise;
+          const grayscalePdf = await PDFDocument.create();
+          
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            if (context) {
+              await page.render({ canvasContext: context, viewport, canvas: canvas as any }).promise;
+              const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+              const data = imageData.data;
+              for (let j = 0; j < data.length; j += 4) {
+                const avg = (data[j] + data[j + 1] + data[j + 2]) / 3;
+                data[j] = avg;
+                data[j + 1] = avg;
+                data[j + 2] = avg;
+              }
+              context.putImageData(imageData, 0, 0);
+              const imgBytes = await new Promise<Uint8Array>((resolve) => {
+                canvas.toBlob((blob) => {
+                  blob?.arrayBuffer().then(buffer => resolve(new Uint8Array(buffer)));
+                }, 'image/jpeg', 0.8);
+              });
+              const img = await grayscalePdf.embedJpg(imgBytes);
+              const newPage = grayscalePdf.addPage([img.width, img.height]);
+              newPage.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+            }
+          }
+          const pdfBytes = await grayscalePdf.save();
+          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+          newResults.push({ 
+            name: `grayscale_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: 'Grayscale',
+            size: blob.size,
+            pageCount: grayscalePdf.getPageCount()
+          });
+        } else if (activeTool === 'flatten') {
+          const form = pdfDoc.getForm();
+          form.flatten();
+          const pdfBytes = await pdfDoc.save();
+          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+          newResults.push({ 
+            name: `flattened_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: 'Flattened',
+            size: blob.size,
+            pageCount: pdfDoc.getPageCount()
+          });
+        } else if (activeTool === 'sanitize') {
+          pdfDoc.setTitle('');
+          pdfDoc.setAuthor('');
+          pdfDoc.setSubject('');
+          pdfDoc.setCreator('');
+          pdfDoc.setProducer('');
+          pdfDoc.setCreationDate(new Date());
+          pdfDoc.setModificationDate(new Date());
+          // Remove XMP metadata
+          try {
+            pdfDoc.catalog.set(PDFName.of('Metadata'), undefined as any);
+          } catch (e) {
+            console.warn('Could not remove XMP metadata:', e);
+          }
+          const pdfBytes = await pdfDoc.save();
+          const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+          newResults.push({ 
+            name: `sanitized_${file.name}`, 
+            blob, 
+            url: URL.createObjectURL(blob), 
+            pageRange: 'Sanitized',
+            size: blob.size,
+            pageCount: pdfDoc.getPageCount()
+          });
         }
       };
 
       if (activeTool === 'merge') {
         const mergedPdf = await PDFDocument.create();
+        mergedPdf.setCreator('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
+        mergedPdf.setProducer('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
         for (const f of files) {
           const arrayBuffer = await f.file.arrayBuffer();
           const pdfDoc = await PDFDocument.load(arrayBuffer);
@@ -584,10 +810,14 @@ export default function App() {
           name: `merged_document.pdf`,
           blob,
           url: URL.createObjectURL(blob),
-          pageRange: `All pages`
+          pageRange: `All pages`,
+          size: blob.size,
+          pageCount: mergedPdf.getPageCount()
         });
       } else if (activeTool === 'img2pdf') {
         const pdfDoc = await PDFDocument.create();
+        pdfDoc.setCreator('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
+        pdfDoc.setProducer('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
         for (const f of files) {
           const arrayBuffer = await f.file.arrayBuffer();
           let image;
@@ -603,7 +833,14 @@ export default function App() {
         }
         const pdfBytes = await pdfDoc.save();
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-        newResults.push({ name: `images_to_pdf.pdf`, blob, url: URL.createObjectURL(blob), pageRange: `${files.length} images` });
+        newResults.push({ 
+          name: `images_to_pdf.pdf`, 
+          blob, 
+          url: URL.createObjectURL(blob), 
+          pageRange: `${files.length} images`,
+          size: blob.size,
+          pageCount: pdfDoc.getPageCount()
+        });
       } else if (activeTool === 'protect' || activeTool === 'unlock') {
         // Placeholder for static hosting compatibility
         throw new Error(`The "${activeTool === 'protect' ? 'Protect' : 'Unlock'}" tool is currently unavailable in this static version. For security reasons, this feature requires a specialized environment not supported by standard static hosting.`);
@@ -639,7 +876,11 @@ export default function App() {
 
   const continueWithTool = (result: SplitResult, toolId: ToolType) => {
     const file = new File([result.blob], result.name, { type: result.blob.type });
-    setFiles([{ id: Math.random().toString(36).substring(2, 9) + Date.now(), file }]);
+    const id = Math.random().toString(36).substring(2, 9) + Date.now();
+    setFiles([{ id, file }]);
+    if (result.pageCount) {
+      setFilePageCounts(prev => ({ ...prev, [id]: result.pageCount }));
+    }
     setActiveTool(toolId);
     setResults([]);
     setError(null);
@@ -1017,13 +1258,21 @@ export default function App() {
                                       transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                       className={`flex items-center justify-between p-3 md:p-5 rounded-xl md:rounded-2xl border cursor-grab active:cursor-grabbing transition-colors ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-gray-50 border-gray-100'}`}
                                     >
-                                      <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+                                      <div className="flex items-center gap-3 md:gap-4 min-w-0">
                                         <div className={`w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 ${activeTool === 'img2pdf' ? 'bg-emerald-600' : 'bg-blue-600'}`}>
                                           {activeTool === 'img2pdf' ? <ImageIcon className="w-5 h-5 md:w-6 md:h-6 text-white" /> : <FileUp className="w-5 h-5 md:w-6 md:h-6 text-white" />}
                                         </div>
-                                        <div className="overflow-hidden">
-                                          <h3 className={`font-bold text-sm md:text-base truncate max-w-[150px] md:max-w-[300px] ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{f.file.name}</h3>
-                                          <p className="text-[10px] md:text-xs text-slate-500">{(f.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        <div className="min-w-0 flex-1">
+                                          <h3 className={`font-bold text-sm md:text-base truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{f.file.name}</h3>
+                                          <div className="flex items-center gap-2">
+                                            <p className="text-[10px] md:text-xs text-slate-500">{(f.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                            {filePageCounts[f.id] && (
+                                              <>
+                                                <span className="text-[10px] md:text-xs text-slate-400">•</span>
+                                                <p className="text-[10px] md:text-xs text-slate-500 font-medium">{filePageCounts[f.id]} {filePageCounts[f.id] === 1 ? 'Page' : 'Pages'}</p>
+                                              </>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-1 md:gap-2">
@@ -1047,16 +1296,24 @@ export default function App() {
                             ) : (
                               files.map((f, i) => (
                                 <div key={f.id} className={`flex items-center justify-between p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-gray-50 border-gray-100'}`}>
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                                  <div className="flex items-center gap-4 min-w-0">
+                                    <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
                                       <FileUp className="w-6 h-6 text-white" />
                                     </div>
-                                    <div>
-                                      <h3 className={`font-bold truncate max-w-[200px] ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{f.file.name}</h3>
-                                      <p className="text-xs text-slate-500">{(f.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    <div className="min-w-0 flex-1">
+                                      <h3 className={`font-bold truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{f.file.name}</h3>
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-xs text-slate-500">{(f.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        {filePageCounts[f.id] && (
+                                          <>
+                                            <span className="text-xs text-slate-400">•</span>
+                                            <p className="text-xs text-slate-500 font-medium">{filePageCounts[f.id]} {filePageCounts[f.id] === 1 ? 'Page' : 'Pages'}</p>
+                                          </>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
-                                  <button onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))} className="p-2 text-slate-500 hover:text-red-500 transition-colors">
+                                  <button onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))} className="p-2 text-slate-500 hover:text-red-500 transition-colors shrink-0">
                                     <Trash2 className="w-5 h-5" />
                                   </button>
                                 </div>
@@ -1247,6 +1504,38 @@ export default function App() {
                             </Reorder.Group>
                           </div>
                         )}
+                        {activeTool === 'pdf2img' && (
+                          <div className="space-y-6">
+                            <div className="space-y-4">
+                              <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Image Resolution</label>
+                              <div className="flex gap-2">
+                                {( [ { label: 'Normal (150 DPI)', value: 150 }, { label: 'High (300 DPI)', value: 300 } ] as const).map(res => (
+                                  <button
+                                    key={res.value}
+                                    onClick={() => setImgResolution(res.value as 150 | 300)}
+                                    className={`flex-1 py-3 rounded-xl border font-bold transition-all text-xs md:text-sm ${imgResolution === res.value ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-gray-200 text-gray-500'}`}
+                                  >
+                                    {res.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="space-y-4">
+                              <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Output Format</label>
+                              <div className="flex gap-2">
+                                {( [ { label: 'PNG', value: 'image/png' }, { label: 'JPG', value: 'image/jpeg' }, { label: 'WebP', value: 'image/webp' } ] as const).map(fmt => (
+                                  <button
+                                    key={fmt.value}
+                                    onClick={() => setImgFormat(fmt.value as any)}
+                                    className={`flex-1 py-3 rounded-xl border font-bold transition-all text-xs md:text-sm ${imgFormat === fmt.value ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-gray-200 text-gray-500'}`}
+                                  >
+                                    {fmt.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {activeTool === 'extractText' && (
                           <p className="text-sm font-bold text-slate-500">Extract all text content from the PDF for viewing and downloading.</p>
                         )}
@@ -1381,6 +1670,57 @@ export default function App() {
                             <p className="text-xs text-slate-500 italic">The signature will be added to the selected position on the specified page.</p>
                           </div>
                         )}
+                        {activeTool === 'metadata' && (
+                          <div className="space-y-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                              <div className="space-y-4">
+                                <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Title</label>
+                                <input type="text" value={metadataTitle} onChange={(e) => setMetadataTitle(e.target.value)} placeholder="Document Title" className={`w-full p-4 rounded-2xl border outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'}`} />
+                              </div>
+                              <div className="space-y-4">
+                                <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Author</label>
+                                <input type="text" value={metadataAuthor} onChange={(e) => setMetadataAuthor(e.target.value)} placeholder="Author Name" className={`w-full p-4 rounded-2xl border outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'}`} />
+                              </div>
+                              <div className="space-y-4">
+                                <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Subject</label>
+                                <input type="text" value={metadataSubject} onChange={(e) => setMetadataSubject(e.target.value)} placeholder="Document Subject" className={`w-full p-4 rounded-2xl border outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'}`} />
+                              </div>
+                              <div className="space-y-4">
+                                <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Creator</label>
+                                <input type="text" value={metadataCreator} onChange={(e) => setMetadataCreator(e.target.value)} placeholder="Application Creator" className={`w-full p-4 rounded-2xl border outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'}`} />
+                              </div>
+                            </div>
+                            <p className="text-xs text-slate-500 italic">These properties will be embedded into the PDF file's metadata.</p>
+                          </div>
+                        )}
+                        {activeTool === 'grayscale' && (
+                          <div className="space-y-4">
+                            <p className="text-sm font-bold text-slate-500">This tool will convert all pages of your PDF into black and white images and re-embed them into a new PDF document.</p>
+                            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                              <p className="text-xs text-amber-600 font-medium flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4" />
+                                Note: This process may increase file size as pages are converted to images.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        {activeTool === 'flatten' && (
+                          <div className="space-y-4">
+                            <p className="text-sm font-bold text-slate-500">Flattening will merge all interactive form fields and annotations into the page content, making them non-editable.</p>
+                            <p className="text-xs text-slate-500 italic">Perfect for final versions of forms or signed documents.</p>
+                          </div>
+                        )}
+                        {activeTool === 'sanitize' && (
+                          <div className="space-y-4">
+                            <p className="text-sm font-bold text-slate-500">Sanitization removes all metadata, XMP data, and resets creation/modification dates to provide a clean file for sharing.</p>
+                            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+                              <p className="text-xs text-blue-600 font-medium flex items-center gap-2">
+                                <ShieldCheck className="w-4 h-4" />
+                                Your document will be stripped of all identifying hidden information.
+                              </p>
+                            </div>
+                          </div>
+                        )}
                         {activeTool === 'merge' && <p className="text-sm font-bold text-slate-500">Files will be merged in the order shown above.</p>}
                       </div>
 
@@ -1424,7 +1764,8 @@ export default function App() {
                                       className={`w-full p-1 px-2 rounded border outline-none text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
                                       autoFocus
                                     />
-                                    <button 
+                                    <motion.button 
+                                      whileTap={{ scale: 0.9 }}
                                       onClick={() => {
                                         const updatedResults = [...results];
                                         updatedResults[i].name = newName.endsWith('.pdf') || newName.endsWith('.png') || newName.endsWith('.txt') ? newName : `${newName}${r.name.substring(r.name.lastIndexOf('.'))}`;
@@ -1434,16 +1775,19 @@ export default function App() {
                                       className="p-1.5 bg-green-500 text-white rounded"
                                     >
                                       <Check className="w-4 h-4" />
-                                    </button>
+                                    </motion.button>
                                   </div>
                                 ) : (
                                   <p className={`font-bold text-sm md:text-base truncate max-w-[120px] md:max-w-[300px] ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{r.name}</p>
                                 )}
-                                <p className="text-[10px] md:text-xs text-slate-500">{r.pageRange}</p>
+                                <p className="text-[10px] md:text-xs text-slate-500">
+                                  {r.pageRange} • {r.pageCount} {r.pageCount === 1 ? 'page' : 'pages'} • {(r.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-1.5 md:gap-2">
-                              <button 
+                              <motion.button 
+                                whileTap={{ scale: 0.9 }}
                                 onClick={() => {
                                   setRenamingId(i);
                                   setNewName(r.name);
@@ -1452,12 +1796,39 @@ export default function App() {
                                 title="Rename"
                               >
                                 <Type className="w-4 h-4 md:w-5 md:h-5" />
-                              </button>
-                              <a href={r.url} download={r.name} className="p-2 md:p-2.5 md:p-4 bg-blue-600 text-white rounded-xl md:rounded-2xl hover:bg-blue-700 shadow-lg shadow-blue-500/20">
+                              </motion.button>
+                              {r.blob.type === 'application/pdf' && (
+                                <motion.button 
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => window.open(r.url, '_blank')}
+                                  className={`p-2 md:p-2.5 md:p-4 rounded-xl md:rounded-2xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-900'}`}
+                                  title="Preview in Browser"
+                                >
+                                  <Eye className="w-4 h-4 md:w-5 md:h-5" />
+                                </motion.button>
+                              )}
+                              <motion.a 
+                                whileTap={{ scale: 0.9 }}
+                                href={r.url} 
+                                download={r.name} 
+                                className="p-2 md:p-2.5 md:p-4 bg-blue-600 text-white rounded-xl md:rounded-2xl hover:bg-blue-700 shadow-lg shadow-blue-500/20"
+                              >
                                 <Download className="w-4 h-4 md:w-5 md:h-5" />
-                              </a>
+                              </motion.a>
                             </div>
                           </div>
+                          
+                          {activeTool === 'pdf2img' && (
+                            <div className={`p-4 md:p-6 rounded-2xl md:rounded-3xl border ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-gray-50 border-gray-100'}`}>
+                              <div className="flex items-center gap-2 mb-4">
+                                <ImageIcon className="w-4 h-4 text-blue-500" />
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Image Preview</span>
+                              </div>
+                              <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800">
+                                <img src={r.url} alt={r.name} className="w-full h-full object-contain" />
+                              </div>
+                            </div>
+                          )}
                           
                           {r.blob.type === 'application/pdf' && (
                             <div className={`p-4 md:p-5 rounded-2xl md:rounded-3xl border flex flex-col gap-3 md:gap-4 ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-blue-50/30 border-blue-100'}`}>
