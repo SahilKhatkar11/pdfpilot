@@ -7,6 +7,13 @@
 ![Vite](https://img.shields.io/badge/Vite-6-purple.svg)
 ![Tailwind](https://img.shields.io/badge/Tailwind-4-blue.svg)
 
+## 🌐 Live Demo
+
+Try the live version of the app here:  
+👉 [PDFPilot Live](https://sahilkhatkar11.github.io/pdfpilot/)
+
+No installation required — just open the link and start using the app instantly.
+
 ## 🛡️ Privacy First
 
 Privacy isn't just a feature; it's our core principle.
@@ -33,6 +40,10 @@ PDFPilot offers a comprehensive set of tools to handle your daily PDF tasks:
 - **Watermark:** Add text watermarks to your documents.
 - **Duplicate & Blank Pages:** Easily insert blank pages or duplicate existing ones.
 - **Reverse PDF:** Instantly flip the page order of your document.
+- **Manage Metadata:** View and edit document properties (Title, Author, Subject, Creator).
+- **Grayscale PDF:** Convert full-color PDFs to black and white.
+- **Flatten PDF:** Make interactive forms and annotations permanent.
+- **Sanitize PDF:** Remove hidden sensitive data and metadata.
 
 ## 📱 Modern & Responsive UI
 
@@ -76,14 +87,6 @@ PDFPilot offers a comprehensive set of tools to handle your daily PDF tasks:
    ```bash
    npm run build
    ```
-
-## 🌐 Deployment (GitHub Pages)
-
-This app is optimized for static hosting. To deploy to GitHub Pages:
-
-1. Build the project: `npm run build`
-2. Deploy the contents of the `dist/` folder to your `gh-pages` branch.
-3. Alternatively, use the [GitHub Pages Action for Vite](https://github.com/marketplace/actions/deploy-to-github-pages).
 
 ## 📄 License
 
