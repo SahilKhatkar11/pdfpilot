@@ -768,20 +768,17 @@ export default function App() {
             pageCount: pdfDoc.getPageCount()
           });
         } else if (activeTool === 'sanitize') {
-          pdfDoc.setTitle('');
-          pdfDoc.setAuthor('');
-          pdfDoc.setSubject('');
-          pdfDoc.setCreator('');
-          pdfDoc.setProducer('');
-          pdfDoc.setCreationDate(new Date());
-          pdfDoc.setModificationDate(new Date());
-          // Remove XMP metadata
-          try {
-            pdfDoc.catalog.set(PDFName.of('Metadata'), undefined as any);
-          } catch (e) {
-            console.warn('Could not remove XMP metadata:', e);
-          }
-          const pdfBytes = await pdfDoc.save();
+          const sanitizedPdf = await PDFDocument.create();
+          const copiedPages = await sanitizedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+          copiedPages.forEach((page) => sanitizedPdf.addPage(page));
+          
+          // Set clean metadata
+          sanitizedPdf.setCreator('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
+          sanitizedPdf.setProducer('PDFPilot (https://github.com/SahilKhatkar11/pdfpilot)');
+          sanitizedPdf.setCreationDate(new Date());
+          sanitizedPdf.setModificationDate(new Date());
+          
+          const pdfBytes = await sanitizedPdf.save();
           const blob = new Blob([pdfBytes], { type: 'application/pdf' });
           newResults.push({ 
             name: `sanitized_${file.name}`, 
@@ -789,7 +786,7 @@ export default function App() {
             url: URL.createObjectURL(blob), 
             pageRange: 'Sanitized',
             size: blob.size,
-            pageCount: pdfDoc.getPageCount()
+            pageCount: sanitizedPdf.getPageCount()
           });
         }
       };
