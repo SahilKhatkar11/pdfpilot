@@ -93,6 +93,86 @@ const Logo = ({ isDarkMode, className = "", onClick }: { isDarkMode: boolean; cl
   </div>
 );
 
+const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: () => void; isDarkMode: boolean }) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 md:p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+              className="fixed inset-0 bg-black/40 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`w-full max-w-xl z-10 overflow-hidden rounded-3xl shadow-2xl border ${
+                isDarkMode 
+                  ? 'bg-slate-900/90 border-white/10 text-white shadow-black/50' 
+                  : 'bg-white/90 border-slate-200/60 text-slate-900'
+              } backdrop-blur-xl relative`}
+            >
+            <button 
+              onClick={onClose}
+              className={`absolute top-5 right-5 p-2 rounded-full transition-colors z-20 ${
+                isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
+              }`}
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="p-8 md:p-10 space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/30">
+                  <PlaneTakeoff className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tight font-display">PDFPilot</h2>
+                  <p className="text-sm font-medium text-blue-600 uppercase tracking-widest px-0.5">Privacy First Suite</p>
+                </div>
+              </div>
+
+              <p className={`text-lg leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                PDFPilot is a high-performance, browser-based PDF utility suite. We prioritize your data security by performing all operations 100% locally on your machine—your files never touch a server.
+              </p>
+
+              <div className="space-y-4">
+                <h3 className={`text-xs font-black uppercase tracking-[0.2em] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Main Features
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { title: 'Local Processing', desc: 'Secure & Offline' },
+                    { title: 'Privacy Focused', desc: 'No data collection' },
+                    { title: 'Merge & Split', desc: 'Organize pages' },
+                    { title: 'Metadata Tools', desc: 'Sanitize & Edit' }
+                  ].map((f, i) => (
+                    <div key={i} className={`p-4 rounded-2xl border transition-colors ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}>
+                      <p className="font-bold text-sm tracking-tight">{f.title}</p>
+                      <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{f.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-8 border-t border-slate-200 dark:border-white/10 text-center">
+                <p className={`text-sm italic ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Crafted for excellence by <span className="font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Sahil Khatkar</span>
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 export default function App() {
   const [activeTool, setActiveTool] = useState<ToolType | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -101,6 +181,7 @@ export default function App() {
   const [results, setResults] = useState<SplitResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   
   // Tool-specific states
   const [pagesPerSplit, setPagesPerSplit] = useState<number>(10);
@@ -978,7 +1059,19 @@ export default function App() {
               />
             </div>
 
-            {!activeTool && (
+            <div className="flex items-center gap-2 md:gap-3">
+              <button
+                onClick={() => setIsInfoModalOpen(true)}
+                className={`p-2.5 rounded-xl transition-all duration-300 shadow-lg ${
+                  isDarkMode 
+                    ? 'bg-slate-800 text-slate-400 shadow-slate-900/50 hover:bg-slate-700 hover:text-white' 
+                    : 'bg-white text-slate-600 shadow-slate-200 hover:bg-slate-50 hover:text-gray-900'
+                }`}
+                title="Application Info"
+              >
+                <Info className="w-5 h-5 md:w-6 md:h-6" />
+              </button>
+
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 className={`p-2.5 rounded-xl transition-all duration-300 shadow-lg ${
@@ -986,10 +1079,11 @@ export default function App() {
                     ? 'bg-slate-800 text-yellow-400 shadow-slate-900/50 hover:bg-slate-700' 
                     : 'bg-white text-slate-600 shadow-slate-200 hover:bg-slate-50'
                 }`}
+                title="Toggle Theme"
               >
                 {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
-            )}
+            </div>
           </div>
         </header>
 
@@ -2028,6 +2122,11 @@ export default function App() {
           </motion.div>
         </div>
       </motion.footer>
+      <InfoModal 
+        isOpen={isInfoModalOpen} 
+        onClose={() => setIsInfoModalOpen(false)} 
+        isDarkMode={isDarkMode} 
+      />
     </div>
   </div>
   );
