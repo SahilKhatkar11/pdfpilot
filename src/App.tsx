@@ -173,6 +173,104 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
   );
 };
 
+const PdfPreviewModal = ({ isOpen, onClose, url, name, isDarkMode }: { isOpen: boolean; onClose: () => void; url: string | null; name: string; isDarkMode: boolean }) => {
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen && url) {
+      const loadPdf = async () => {
+        try {
+          const loadingTask = pdfjs.getDocument(url);
+          const pdf = await loadingTask.promise;
+          setNumPages(pdf.numPages);
+          
+          if (containerRef.current) {
+            containerRef.current.innerHTML = '';
+            for (let i = 1; i <= Math.min(pdf.numPages, 20); i++) { // Limit to 20 pages for preview performance
+              const page = await pdf.getPage(i);
+              const viewport = page.getViewport({ scale: 1.5 });
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              canvas.className = "w-full mb-4 rounded-lg shadow-lg";
+              
+              if (context) {
+                await page.render({ canvasContext: context, viewport, canvas: canvas as any }).promise;
+                containerRef.current.appendChild(canvas);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error rendering PDF preview:', error);
+        }
+      };
+      loadPdf();
+    }
+  }, [isOpen, url]);
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 md:p-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-md"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className={`w-full h-full md:max-w-4xl md:h-[90vh] z-10 overflow-hidden flex flex-col ${
+              isDarkMode 
+                ? 'bg-slate-950 border-white/10 text-white' 
+                : 'bg-gray-100 border-slate-200 text-slate-900'
+            } md:rounded-3xl border shadow-2xl relative`}
+          >
+            <div className={`p-4 md:p-6 border-b flex items-center justify-between shrink-0 ${isDarkMode ? 'bg-slate-900 border-white/5' : 'bg-white border-gray-100'}`}>
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
+                <div className="overflow-hidden">
+                  <h3 className="font-bold truncate">{name}</h3>
+                  <p className="text-xs text-slate-500">{numPages ? `${numPages} pages` : 'Loading...'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={url || '#'} download={name} className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">
+                  <Download className="w-5 h-5" />
+                </a>
+                <button 
+                  onClick={onClose}
+                  className={`p-2 rounded-xl transition-colors ${
+                    isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 flex flex-col items-center">
+              <div ref={containerRef} className="w-full max-w-2xl mx-auto" />
+              {numPages && numPages > 20 && (
+                <div className={`p-6 rounded-2xl border text-center ${isDarkMode ? 'bg-slate-900 border-white/5' : 'bg-white border-gray-100'}`}>
+                  <p className="text-slate-500">Previewing first 20 pages. Download to view the full document.</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 export default function App() {
   const [activeTool, setActiveTool] = useState<ToolType | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -193,7 +291,8 @@ export default function App() {
   const [previews, setPreviews] = useState<string[]>([]); // For organize tool previews
   const [selectedPages, setSelectedPages] = useState<number[]>([]); // For bulk organize
   const [numberPosition, setNumberPosition] = useState<'left' | 'center' | 'right'>('center');
-  const [numberFormat, setNumberFormat] = useState<'simple' | 'fraction' | 'full'>('fraction');
+  const [numberVPosition, setNumberVPosition] = useState<'top' | 'bottom'>('bottom');
+  const [numberFormat, setNumberFormat] = useState<string>('fraction');
   
   // New tool states
   const [imgResolution, setImgResolution] = useState<150 | 300>(150);
@@ -261,6 +360,15 @@ export default function App() {
       }
     }
   }, [strokes, currentStroke, drawColor, activeTool]);
+
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string>('');
+
+  // Scroll to top when tool changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeTool]);
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     if (!canvasRef.current) return;
@@ -618,15 +726,37 @@ export default function App() {
           const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
           const pages = pdfDoc.getPages();
           pages.forEach(page => {
+            const rotation = page.getRotation().angle;
             const { width, height } = page.getSize();
+            
+            // Visual dimensions
+            const vx = width / 4;
+            const vy = height / 2;
+
+            // Mapping visual to internal coordinates
+            const isHorizontal = rotation === 90 || rotation === 270;
+            const originalWidth = isHorizontal ? height : width;
+            const originalHeight = isHorizontal ? width : height;
+
+            let drawX, drawY;
+            if (rotation === 0) {
+              drawX = vx; drawY = vy;
+            } else if (rotation === 90) {
+              drawX = originalWidth - vy; drawY = vx;
+            } else if (rotation === 180) {
+              drawX = originalWidth - vx; drawY = originalHeight - vy;
+            } else { // 270
+              drawX = vy; drawY = originalHeight - vx;
+            }
+
             page.drawText(watermarkText, {
-              x: width / 4,
-              y: height / 2,
+              x: drawX,
+              y: drawY,
               size: 50,
               font,
               color: rgb(0.7, 0.7, 0.7),
               opacity: 0.3,
-              rotate: { type: 'degrees', angle: 45 } as any,
+              rotate: degrees(45 - rotation), // Keep visual 45 degrees regardless of page rotation
             });
           });
           const pdfBytes = await pdfDoc.save();
@@ -642,24 +772,78 @@ export default function App() {
         } else if (activeTool === 'number') {
           const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
           const pages = pdfDoc.getPages();
+
+          const toRoman = (num: number): string => {
+            const roman: { [key: string]: number } = {
+              M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1
+            };
+            let str = '';
+            for (let i of Object.keys(roman)) {
+              let q = Math.floor(num / roman[i]);
+              num -= q * roman[i];
+              str += i.repeat(q);
+            }
+            return str;
+          };
+
+          const toAlpha = (num: number): string => {
+            let alpha = '';
+            while (num > 0) {
+              let m = (num - 1) % 26;
+              alpha = String.fromCharCode(65 + m) + alpha;
+              num = Math.floor((num - m) / 26);
+            }
+            return alpha;
+          };
+
           pages.forEach((page, i) => {
-            const { width } = page.getSize();
+            const rotation = page.getRotation().angle;
+            const { width, height } = page.getSize();
+            
+            const isHorizontal = rotation === 90 || rotation === 270;
+            const originalWidth = isHorizontal ? height : width;
+            const originalHeight = isHorizontal ? width : height;
+
             let text = '';
             if (numberFormat === 'simple') text = `${i + 1}`;
             else if (numberFormat === 'fraction') text = `${i + 1}/${pages.length}`;
-            else text = `Page ${i + 1} of ${pages.length}`;
+            else if (numberFormat === 'full') text = `Page ${i + 1} of ${pages.length}`;
+            else if (numberFormat === 'roman-upper') text = toRoman(i + 1);
+            else if (numberFormat === 'roman-lower') text = toRoman(i + 1).toLowerCase();
+            else if (numberFormat === 'alpha-upper') text = toAlpha(i + 1);
+            else if (numberFormat === 'alpha-lower') text = toAlpha(i + 1).toLowerCase();
 
             const textWidth = font.widthOfTextAtSize(text, 10);
-            let x = width / 2 - textWidth / 2;
-            if (numberPosition === 'left') x = 40;
-            else if (numberPosition === 'right') x = width - textWidth - 40;
+            
+            // Visual coordinates
+            let vx = width / 2 - textWidth / 2;
+            if (numberPosition === 'left') vx = 40;
+            else if (numberPosition === 'right') vx = width - textWidth - 40;
+            
+            let vy = numberVPosition === 'bottom' ? 25 : height - 35;
+
+            let drawX, drawY;
+            if (rotation === 0) {
+              drawX = vx; drawY = vy;
+            } else if (rotation === 90) {
+              // 90 Deg Clockwise: Origin (drawX, drawY) for text should be adjusted
+              drawX = originalWidth - vy; 
+              drawY = vx; 
+            } else if (rotation === 180) {
+              drawX = originalWidth - vx; 
+              drawY = originalHeight - vy;
+            } else { // 270
+              drawX = vy; 
+              drawY = originalHeight - vx;
+            }
 
             page.drawText(text, {
-              x,
-              y: 25,
+              x: drawX,
+              y: drawY,
               size: 10,
               font,
               color: rgb(0, 0, 0),
+              rotate: degrees(-rotation), // Counter-rotate text to stay upright
             });
           });
           const pdfBytes = await pdfDoc.save();
@@ -718,43 +902,62 @@ export default function App() {
           const pages = pdfDoc.getPages();
           const targetPageIdx = Math.max(0, Math.min(signPageNum - 1, pages.length - 1));
           const targetPage = pages[targetPageIdx];
+          const rotation = targetPage.getRotation().angle;
           const { width, height } = targetPage.getSize();
           
+          const isHorizontal = rotation === 90 || rotation === 270;
+          const originalWidth = isHorizontal ? height : width;
+          const originalHeight = isHorizontal ? width : height;
+
           if (signatureData) {
             const sigImage = await pdfDoc.embedPng(signatureData);
             const sigDims = sigImage.scale(0.5);
             
-            let x = 0;
-            let y = 0;
+            // Visual coordinates
+            let vx = 0;
+            let vy = 0;
             
             switch (signPosition) {
               case 'top-left':
-                x = 50;
-                y = height - sigDims.height - 50;
+                vx = 50;
+                vy = height - sigDims.height - 50;
                 break;
               case 'top-right':
-                x = width - sigDims.width - 50;
-                y = height - sigDims.height - 50;
+                vx = width - sigDims.width - 50;
+                vy = height - sigDims.height - 50;
                 break;
               case 'bottom-left':
-                x = 50;
-                y = 50;
+                vx = 50;
+                vy = 50;
                 break;
               case 'bottom-right':
-                x = width - sigDims.width - 50;
-                y = 50;
+                vx = width - sigDims.width - 50;
+                vy = 50;
                 break;
               case 'center':
-                x = (width - sigDims.width) / 2;
-                y = (height - sigDims.height) / 2;
+                vx = (width - sigDims.width) / 2;
+                vy = (height - sigDims.height) / 2;
                 break;
+            }
+
+            // Map visual to internal
+            let drawX, drawY;
+            if (rotation === 0) {
+              drawX = vx; drawY = vy;
+            } else if (rotation === 90) {
+              drawX = originalWidth - vy; drawY = vx;
+            } else if (rotation === 180) {
+              drawX = originalWidth - vx; drawY = originalHeight - vy;
+            } else { // 270
+              drawX = vy; drawY = originalHeight - vx;
             }
             
             targetPage.drawImage(sigImage, {
-              x,
-              y,
+              x: drawX,
+              y: drawY,
               width: sigDims.width,
               height: sigDims.height,
+              rotate: degrees(-rotation), // Counter-rotate image
             });
           }
 
@@ -964,6 +1167,8 @@ export default function App() {
     setError(null);
     if (toolId === 'organize') {
       loadPdfPages(file);
+    } else if (toolId === 'metadata') {
+      loadMetadata(file);
     }
   };
 
@@ -1469,7 +1674,21 @@ export default function App() {
                         {activeTool === 'number' && (
                           <div className="space-y-6">
                             <div className="space-y-4">
-                              <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Position</label>
+                              <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Vertical Position</label>
+                              <div className="flex gap-2">
+                                {(['top', 'bottom'] as const).map(pos => (
+                                  <button
+                                    key={pos}
+                                    onClick={() => setNumberVPosition(pos)}
+                                    className={`flex-1 py-3 rounded-xl border font-bold capitalize transition-all ${numberVPosition === pos ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-gray-200 text-gray-500'}`}
+                                  >
+                                    {pos}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="space-y-4">
+                              <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Horizontal Position</label>
                               <div className="flex gap-2">
                                 {(['left', 'center', 'right'] as const).map(pos => (
                                   <button
@@ -1488,11 +1707,15 @@ export default function App() {
                                 {[
                                   { id: 'simple', label: '1 (Just number)' },
                                   { id: 'fraction', label: '1/5 (Fraction)' },
-                                  { id: 'full', label: 'Page 1 of 5 (Full text)' }
+                                  { id: 'full', label: 'Page 1 of 5 (Full text)' },
+                                  { id: 'roman-upper', label: 'I, II, III (Roman Uppercase)' },
+                                  { id: 'roman-lower', label: 'i, ii, iii (Roman Lowercase)' },
+                                  { id: 'alpha-upper', label: 'A, B, C (Alphabet Uppercase)' },
+                                  { id: 'alpha-lower', label: 'a, b, c (Alphabet Lowercase)' }
                                 ].map(fmt => (
                                   <button
                                     key={fmt.id}
-                                    onClick={() => setNumberFormat(fmt.id as any)}
+                                    onClick={() => setNumberFormat(fmt.id)}
                                     className={`w-full py-3 px-4 rounded-xl border font-bold text-left transition-all ${numberFormat === fmt.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-gray-200 text-gray-500'}`}
                                   >
                                     {fmt.label}
@@ -1891,7 +2114,11 @@ export default function App() {
                               {r.blob.type === 'application/pdf' && (
                                 <motion.button 
                                   whileTap={{ scale: 0.9 }}
-                                  onClick={() => window.open(r.url, '_blank')}
+                                  onClick={() => {
+                                    setPreviewUrl(r.url);
+                                    setPreviewName(r.name);
+                                    setIsPreviewOpen(true);
+                                  }}
                                   className={`p-2 md:p-2.5 md:p-4 rounded-xl md:rounded-2xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-gray-100 text-gray-500 hover:text-gray-900'}`}
                                   title="Preview in Browser"
                                 >
@@ -2126,6 +2353,16 @@ export default function App() {
         isOpen={isInfoModalOpen} 
         onClose={() => setIsInfoModalOpen(false)} 
         isDarkMode={isDarkMode} 
+      />
+      <PdfPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewUrl(null);
+        }}
+        url={previewUrl}
+        name={previewName}
+        isDarkMode={isDarkMode}
       />
     </div>
   </div>
