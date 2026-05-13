@@ -25,25 +25,30 @@ Privacy isn't just a feature; it's our core principle.
 
 PDFPilot offers a comprehensive set of tools to handle your daily PDF tasks:
 
-- **Images to PDF:** Convert JPG/PNG images into a single PDF.
-- **PDF to Images:** Export PDF pages as high-quality PNG images.
+- **Text to PDF:** Convert plain text or markdown to PDF with formatting support.
+- **Image to PDF:** Convert JPG, PNG, and other images into a single PDF instantly.
+- **PDF to Image:** Transform PDF pages into high-resolution image files.
 - **Split PDF:** Break a large PDF into smaller files by page range.
-- **Merge PDF:** Combine multiple PDFs into one (up to 15 files).
-- **Organize PDF:** Rearrange, delete, or reorder pages with drag-and-drop.
-- **Draw / Sign:** Add your signature or draw directly on any PDF page.
-- **Extract Text:** Pull all selectable text from your documents.
-- **Extract Pages:** Save specific pages as a new PDF.
-- **Rotate Pages:** Fix orientation by rotating pages (90°, 180°, 270°).
-- **Protect PDF:** Add password protection to your documents.
-- **Unlock PDF:** Remove password protection from your documents.
-- **Page Numbers:** Add customizable page numbers in various formats.
-- **Watermark:** Add text watermarks to your documents.
-- **Duplicate & Blank Pages:** Easily insert blank pages or duplicate existing ones.
-- **Reverse PDF:** Instantly flip the page order of your document.
-- **Manage Metadata:** View and edit document properties (Title, Author, Subject, Creator).
-- **Grayscale PDF:** Convert full-color PDFs to black and white.
+- **Merge PDF:** Combine multiple PDF files into one organized document.
+- **Organize PDF:** Rearrange, delete, or reorder pages with an intuitive interface.
+- **Draw / Sign:** Add signatures or freehand drawings directly on any page.
+- **Extract Text:** Pull all selectable text from your PDF files for editing.
+- **Extract Pages:** Select and extract specific pages to create a new document.
+- **Rotate PDF:** Fix orientation by rotating pages 90, 180, or 270 degrees.
+- **Page Numbers:** Add professional numbering with customizable positions.
+- **Watermark:** Protect your IP by adding custom text watermarks.
+- **Duplicate Pages:** Easily clone pages multiple times within your document.
+- **Add Blank Pages:** Insert empty pages for notes or future content.
+- **Reverse PDF:** Flip the entire page order of your PDF document instantly.
+- **Copy Pages:** Easily copy specific pages from one PDF into another file.
+- **Draw Images:** Embed and position PNG/JPEG images onto your PDF pages.
+- **Draw Graphics:** Add vector shapes like lines, rectangles, and circles.
+- **Add Attachments:** Securely attach external files directly to your PDF.
+- **Grayscale PDF:** Convert full-color PDF to black and white to save ink.
 - **Flatten PDF:** Make interactive forms and annotations permanent.
-- **Sanitize PDF:** Remove hidden sensitive data and metadata.
+- **Sanitize PDF:** Remove hidden sensitive data, history, and metadata.
+- **Manage Metadata:** View and edit properties like Title, Author, and Subject.
+- **Viewer Preferences:** Control how external viewers display your document.
 
 ## 📱 Modern & Responsive UI
 
