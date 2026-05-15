@@ -56,7 +56,7 @@ import {
   ImageIcon, Plus, Minus, Info, ShieldCheck, Droplets, Maximize,
   Paperclip, Copy, Layout, CheckSquare, Shapes, MousePointer2,
   Undo2, Redo2, Bold, Italic, List as ListIcon, ListOrdered, AlignLeft,
-  AlignCenter, AlignRight, AlignJustify, Link, Smile,
+  AlignCenter, AlignRight, AlignJustify, Link, Smile, Table, Grid2X2,
   Indent, Outdent, Eraser, Baseline, ClipboardPaste, ChevronUp,
   RotateCw, PenTool, Stamp, Files, FileOutput, FilePlus, Image, ArrowDownUp,
   Images, ImagePlus, Shuffle, LayoutGrid
@@ -332,12 +332,12 @@ interface SplitResult {
   text?: string; // For extract text
 }
 
-const Logo = ({ isDarkMode, className = "", onClick }: { isDarkMode: boolean; className?: string; onClick?: () => void }) => (
+const Logo = ({ isDarkMode, className = "", onClick, subtitle }: { isDarkMode: boolean; className?: string; onClick?: () => void; subtitle?: string }) => (
   <div 
     onClick={onClick}
     className={`flex items-center gap-3 group cursor-pointer ${className}`}
   >
-    <div className="relative">
+    <div className="relative shrink-0">
       <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center">
         <div className="relative">
           <PlaneTakeoff className="w-7 h-7 text-white" />
@@ -350,9 +350,16 @@ const Logo = ({ isDarkMode, className = "", onClick }: { isDarkMode: boolean; cl
         <Sparkles className="w-5 h-5 text-yellow-400 fill-yellow-400" />
       </div>
     </div>
-    <span className={`text-2xl font-black tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-      PDF<span className="text-blue-600">Pilot</span>
-    </span>
+    <div className="flex flex-col">
+      <span className={`text-2xl font-black tracking-tighter leading-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+        PDF<span className="text-blue-600">Pilot</span>
+      </span>
+      {subtitle && (
+        <p className={`mt-1.5 text-[10px] font-bold uppercase tracking-[0.2em] ${isDarkMode ? 'text-blue-400/80' : 'text-blue-600/80'}`}>
+          {subtitle}
+        </p>
+      )}
+    </div>
   </div>
 );
 
@@ -556,7 +563,12 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
             </button>
 
             <div className="p-8 md:p-10 space-y-8">
-              <Logo isDarkMode={isDarkMode} />
+              <div className="flex flex-col items-center md:items-start">
+                <Logo 
+                  isDarkMode={isDarkMode} 
+                  subtitle="Privacy-First PDF Suite"
+                />
+              </div>
 
               <p className={`text-lg leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                 PDFPilot is a high-performance, browser-based PDF utility suite. We prioritize your data security by performing all operations 100% locally on your machine—your files never touch a server.
@@ -821,20 +833,58 @@ export default function App() {
 
   const handlePaste = async () => {
     try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        const quill = quillRef.current?.getEditor();
-        if (quill) {
-          const range = quill.getSelection();
-          const index = (range && range.index !== undefined) ? range.index : quill.getLength();
-          quill.insertText(index, text);
-          quill.setSelection(index + text.length, 0);
-        } else {
-          setText2pdfInput(prev => prev + text);
+      const items = await navigator.clipboard.read();
+      let htmlContent = '';
+      let textContent = '';
+
+      for (const item of items) {
+        if (item.types.includes('text/html')) {
+          const blob = await item.getType('text/html');
+          htmlContent = await blob.text();
         }
+        if (item.types.includes('text/plain')) {
+          const blob = await item.getType('text/plain');
+          textContent = await blob.text();
+        }
+      }
+
+      const quill = quillRef.current?.getEditor();
+      if (quill) {
+        const range = quill.getSelection();
+        const index = (range && range.index !== undefined) ? range.index : quill.getLength();
+        
+        if (htmlContent) {
+          quill.clipboard.dangerouslyPasteHTML(index, htmlContent);
+        } else if (textContent) {
+          quill.insertText(index, textContent);
+        }
+        
+        if (textContent) {
+          quill.setSelection(index + textContent.length, 0);
+        }
+      } else {
+        if (htmlContent) setText2pdfInput(prev => prev + htmlContent);
+        else if (textContent) setText2pdfInput(prev => prev + textContent);
       }
     } catch (err) {
       console.error('Failed to read clipboard contents: ', err);
+      // Fallback to plain text if HTML read fails or is not supported
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          const quill = quillRef.current?.getEditor();
+          if (quill) {
+            const range = quill.getSelection();
+            const index = (range && range.index !== undefined) ? range.index : quill.getLength();
+            quill.insertText(index, text);
+            quill.setSelection(index + text.length, 0);
+          } else {
+            setText2pdfInput(prev => prev + text);
+          }
+        }
+      } catch (e) {
+        console.error('Final fallback paste failed:', e);
+      }
     }
   };
 
@@ -842,6 +892,7 @@ export default function App() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [linkData, setLinkData] = useState({ url: '', text: '', title: '', target: '_self' });
   const [showEmojiDialog, setShowEmojiDialog] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   const [copyPagesTargetFile, setCopyPagesTargetFile] = useState<PDFFile | null>(null);
   const [copyPagesRange, setCopyPagesRange] = useState('');
@@ -1206,7 +1257,6 @@ export default function App() {
         let currentPage = page;
 
         const splitText = (text: string, font: any, size: number, maxWidth: number) => {
-          // Normalize text: replace newlines with a marker or split by them
           const paragraphs = sanitizeForPdf(text).split(/\r?\n/);
           const resultLines: string[] = [];
           
@@ -1214,6 +1264,29 @@ export default function App() {
             const words = paragraph.split(' ');
             let currentLine = '';
             for (const word of words) {
+              const wordWidth = font.widthOfTextAtSize(word, size);
+              if (wordWidth > maxWidth) {
+                 if (currentLine) {
+                   resultLines.push(currentLine);
+                   currentLine = '';
+                 }
+                 let longWord = word;
+                 while(longWord.length > 0) {
+                    let i = 1;
+                    while(i <= longWord.length && font.widthOfTextAtSize(longWord.substring(0, i), size) <= maxWidth) {
+                      i++;
+                    }
+                    if (i === 1) {
+                       resultLines.push(longWord.charAt(0));
+                       longWord = longWord.substring(1);
+                    } else {
+                       resultLines.push(longWord.substring(0, i-1));
+                       longWord = longWord.substring(i-1);
+                    }
+                 }
+                 continue;
+              }
+
               const testLine = currentLine ? `${currentLine} ${word}` : word;
               const width = font.widthOfTextAtSize(testLine, size);
               if (width > maxWidth && currentLine) {
@@ -1224,23 +1297,19 @@ export default function App() {
               }
             }
             if (currentLine) resultLines.push(currentLine);
-            else if (paragraphs.length > 1) resultLines.push(''); // Keep empty lines if there were manual line breaks
+            else if (paragraphs.length > 1) resultLines.push(''); 
           }
           return resultLines;
         };
 
         const div = document.createElement('div');
         div.innerHTML = text2pdfInput;
-        
-        // Flatten blocks (we'll look at the children of the editor)
-        // Standard Quill output: <p>, <h1>, <ul><li>...</li></ul>, etc.
         const blocks = Array.from(div.childNodes);
 
         for (const node of blocks) {
           if (node.nodeType === Node.TEXT_NODE) {
             const text = node.textContent?.trim();
             if (!text) continue;
-            // Handle plain text
             const wrapped = splitText(text, font, fontSize, maxWidth);
             for (const line of wrapped) {
               if (currentY < margin + fontSize) {
@@ -1253,13 +1322,66 @@ export default function App() {
           } else if (node.nodeType === Node.ELEMENT_NODE) {
             const el = node as HTMLElement;
             const tag = el.tagName.toLowerCase();
+            
+            if (tag === 'table') {
+              const rows = Array.from(el.querySelectorAll('tr'));
+              if (rows.length === 0) continue;
+              
+              const firstRowCells = Array.from(rows[0].querySelectorAll('td, th'));
+              const colCount = firstRowCells.length;
+              if (colCount === 0) continue;
+              const colWidth = maxWidth / colCount;
+
+              for (const row of rows) {
+                const cells = Array.from(row.querySelectorAll('td, th'));
+                let maxCellLines = 0;
+                const cellContents = cells.map(cell => {
+                  const lines = splitText(cell.innerText || cell.textContent || '', font, fontSize - 2, colWidth - 10);
+                  if (lines.length > maxCellLines) maxCellLines = lines.length;
+                  return lines;
+                });
+
+                const rowHeight = maxCellLines * (fontSize - 2) * 1.4 + 10;
+
+                if (currentY - rowHeight < margin) {
+                  currentPage = pdfDoc.addPage([595.28, 841.89]);
+                  currentY = height - margin;
+                }
+
+                cells.forEach((cell, idx) => {
+                  const x = margin + (idx * colWidth);
+                  const cellLines = cellContents[idx];
+                  
+                  currentPage.drawRectangle({
+                    x: x,
+                    y: currentY - rowHeight,
+                    width: colWidth,
+                    height: rowHeight,
+                    borderWidth: 0.5,
+                    borderColor: rgb(0.7, 0.7, 0.7)
+                  });
+
+                  cellLines.forEach((line, lineIdx) => {
+                    currentPage.drawText(line, {
+                      x: x + 5,
+                      y: currentY - 5 - (fontSize - 2) - (lineIdx * (fontSize - 2) * 1.4),
+                      size: fontSize - 2,
+                      font: cell.tagName.toLowerCase() === 'th' ? fontBold : font,
+                      color: rgb(0, 0, 0)
+                    });
+                  });
+                });
+                currentY -= rowHeight;
+              }
+              currentY -= 10; // Extra space after table
+              continue;
+            }
+
             let currentFont = font;
             let currentFontSize = fontSize;
             let xOffset = 0;
             let isList = false;
-            let listType: 'bullet' | 'ordered' | 'circle' | 'square' = 'bullet';
 
-            // Check for indent classes: ql-indent-1, etc.
             const indentMatch = el.className.match(/ql-indent-(\d+)/);
             if (indentMatch) {
               xOffset += parseInt(indentMatch[1]) * 20;
@@ -1277,7 +1399,6 @@ export default function App() {
             }
 
             const processElement = (element: HTMLElement, subXOffset: number, subFont: any, subSize: number, inheritedListStyle: string | null = null) => {
-              // Handle indentation for individual elements (like LI)
               const elementIndentMatch = element.className.match(/ql-indent-(\d+)/);
               if (elementIndentMatch) {
                 subXOffset += parseInt(elementIndentMatch[1]) * 20;
@@ -1293,21 +1414,15 @@ export default function App() {
                   currentY = height - margin;
                 }
                 
-                // Draw bullet/number for first line of LI
                 if (element.tagName.toLowerCase() === 'li' && line === wrapped[0]) {
                   const parent = element.parentElement;
-                  
-                  // Extremely robust list detection and style extraction
                   const getStyleData = (node: HTMLElement) => {
                     const dataList = node.getAttribute('data-list');
-                    const className = node.className;
-                    const styleType = node.style.listStyleType;
                     const htmlType = node.getAttribute('type');
-                    
-                    // Priority order for type detection
+                    const styleType = node.style.listStyleType;
                     const val = (dataList || htmlType || styleType || '').toLowerCase();
                     
-                    let type = 'ordered'; // default assumption for OL
+                    let type = 'ordered';
                     if (parent?.tagName.toLowerCase() === 'ul') type = 'bullet';
                     
                     if (val.includes('bullet') || val === 'disc') type = 'bullet';
@@ -1317,19 +1432,15 @@ export default function App() {
                     else if (val.includes('roman') || val === 'i' || val === 'I') type = 'roman';
                     else if (val.includes('decimal') || val.includes('ordered') || val.includes('number') || val === '1') type = 'ordered';
                     
-                    // Detect case from raw values
                     const isUpper = (dataList?.includes('upper') || htmlType === 'A' || htmlType === 'I' || styleType?.includes('upper') || val.includes('upper'));
-                    
                     return { type, isUpper };
                   };
 
-                  const styleData = getStyleData(element) || (parent ? getStyleData(parent) : { type: 'bullet', isUpper: false });
+                  const styleData = getStyleData(element);
                   const { type, isUpper } = styleData;
-                  
                   const isOrdered = ['ordered', 'alpha', 'roman'].includes(type);
 
                   if (isOrdered) {
-                    // Numbering/Lettering logic
                     const listItems = Array.from(parent?.children || []).filter(c => c.tagName.toLowerCase() === 'li');
                     const index = listItems.indexOf(element) + 1;
                     let prefix = "";
@@ -1352,16 +1463,13 @@ export default function App() {
                     } else {
                       prefix = `${index}.`;
                     }
-
                     currentPage.drawText(prefix, { x: margin + subXOffset - 25, y: currentY, size: subSize, font: fontBold, color: rgb(0,0,0) });
                   } else {
-                    // Bullets
                     if (type === 'circle') {
                       currentPage.drawCircle({ x: margin + subXOffset - 12, y: currentY + 4, size: 2.5, borderWidth: 1, borderColor: rgb(0,0,0) });
                     } else if (type === 'square') {
                       currentPage.drawRectangle({ x: margin + subXOffset - 14, y: currentY + 2, width: 4.5, height: 4.5, color: rgb(0,0,0) });
                     } else {
-                      // Default bullet (solid disc)
                       currentPage.drawCircle({ x: margin + subXOffset - 12, y: currentY + 4, size: 2.5, color: rgb(0,0,0) });
                     }
                   }
@@ -1381,8 +1489,6 @@ export default function App() {
             } else {
               processElement(el, xOffset, currentFont, currentFontSize);
             }
-
-            // Margin after blocks
             currentY -= 5;
           }
         }
@@ -2489,153 +2595,170 @@ export default function App() {
                             
                             <div className={`rounded-3xl border overflow-hidden transition-all duration-300 ${isDarkMode ? 'bg-slate-950 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl'}`}>
                               {/* Custom Toolbar */}
-                              <div className={`flex flex-wrap items-center gap-2 p-3 border-b sticky top-0 z-20 ${isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-gray-100 bg-white/90'} backdrop-blur-md`}>
-                                <div className="flex items-center gap-0.5">
-                                  <button onClick={undo} disabled={historyIdx === 0} title="Undo" className={`p-2 rounded-lg hover:bg-blue-500/10 disabled:opacity-20 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Undo2 className="w-4 h-4" /></button>
-                                  <button onClick={redo} disabled={historyIdx === inputHistory.length - 1} title="Redo" className={`p-2 rounded-lg hover:bg-blue-500/10 disabled:opacity-20 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Redo2 className="w-4 h-4" /></button>
+                              <div className={`flex flex-wrap items-center gap-1.5 p-2.5 border-b sticky top-0 z-20 ${isDarkMode ? 'border-slate-800 bg-slate-900/90' : 'border-gray-100 bg-white/90'} backdrop-blur-md`}>
+                                <div className="flex items-center gap-0">
+                                  <button onClick={undo} disabled={historyIdx === 0} title="Undo" className={`p-1.5 rounded-lg hover:bg-blue-500/10 disabled:opacity-20 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Undo2 className="w-4 h-4" /></button>
+                                  <button onClick={redo} disabled={historyIdx === inputHistory.length - 1} title="Redo" className={`p-1.5 rounded-lg hover:bg-blue-500/10 disabled:opacity-20 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Redo2 className="w-4 h-4" /></button>
                                 </div>
-                                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1" />
+                                <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-0.5" />
                                 
                                 {/* Format Selector */}
-                                <div className="relative group">
-                                  <button className={`px-3 py-1.5 rounded-lg border text-sm font-medium outline-none flex items-center gap-2 transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
-                                    <Type className="w-4 h-4" />
+                                <div className="relative">
+                                  <button 
+                                    onClick={() => setActiveDropdown(activeDropdown === 'style' ? null : 'style')}
+                                    className={`px-2.5 py-1.5 rounded-lg border text-[13px] font-semibold outline-none flex items-center gap-1.5 transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                                  >
+                                    <Type className="w-3.5 h-3.5" />
                                     <span>Style</span>
-                                    <ChevronDown className="w-3 h-3 opacity-50" />
+                                    <ChevronDown className={`w-3 h-3 opacity-50 transition-transform ${activeDropdown === 'style' ? 'rotate-180' : ''}`} />
                                   </button>
-                                  <div className={`absolute top-full left-0 pt-2 hidden group-hover:block z-[50]`}>
-                                    <div className={`p-2 rounded-2xl shadow-2xl border min-w-[220px] ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'}`}>
-                                      {[
-                                        { id: 'p', label: 'Paragraph', className: 'text-sm font-normal' },
-                                        { id: 'h1', label: 'Heading 1', className: 'text-xl font-black' },
-                                        { id: 'h2', label: 'Heading 2', className: 'text-lg font-extrabold' },
-                                        { id: 'h3', label: 'Heading 3', className: 'text-base font-bold' },
-                                        { id: 'h4', label: 'Heading 4', className: 'text-sm font-semibold uppercase tracking-wider' },
-                                        { id: 'h5', label: 'Heading 5', className: 'text-sm font-semibold underline' },
-                                        { id: 'h6', label: 'Heading 6', className: 'text-xs font-semibold italic' },
-                                        { id: 'pre', label: 'Preformatted', className: 'text-xs font-mono bg-slate-100 dark:bg-slate-800 p-1' }
-                                      ].map(item => (
-                                        <button 
-                                          key={item.id}
-                                          onClick={() => {
-                                            if (item.id === 'p') insertFormat('header', false);
-                                            else if (item.id === 'pre') insertFormat('code-block');
-                                            else insertFormat('header', parseInt(item.id.replace('h', '')));
-                                          }}
-                                          className={`w-full text-left px-4 py-2.5 rounded-xl transition-all ${isDarkMode ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'}`}
-                                        >
-                                          <div className={item.className}>{item.label}</div>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1" />
-                                
-                                <div className="flex items-center gap-0.5">
-                                  <button onClick={() => insertFormat('bold')} title="Bold" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Bold className="w-4 h-4" /></button>
-                                  <button onClick={() => insertFormat('italic')} title="Italic" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Italic className="w-4 h-4" /></button>
-                                </div>
-                                
-                                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1" />
-                                
-                                <div className="flex items-center gap-0.5">
-                                  <button onClick={() => insertFormat('align', '')} title="Align Left" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignLeft className="w-4 h-4" /></button>
-                                  <button onClick={() => insertFormat('align', 'center')} title="Align Center" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignCenter className="w-4 h-4" /></button>
-                                  <button onClick={() => insertFormat('align', 'right')} title="Align Right" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignRight className="w-4 h-4" /></button>
-                                  <button onClick={() => insertFormat('align', 'justify')} title="Justify" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignJustify className="w-4 h-4" /></button>
-                                </div>
-
-                                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1" />
-
-                                <div className="flex items-center gap-0.5">
-                                  <button onClick={() => insertFormat('indent', '-1')} title="Decrease Indent" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Outdent className="w-4 h-4" /></button>
-                                  <button onClick={() => insertFormat('indent', '+1')} title="Increase Indent" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Indent className="w-4 h-4" /></button>
-                                </div>
-
-                                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1" />
-
-                                <div className="flex items-center gap-0.5">
-                                  <div className="relative group">
-                                    <button className={`p-2 rounded-lg hover:bg-blue-500/10 flex items-center gap-1 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                                      <ListIcon className="w-4 h-4" /><ChevronDown className="w-2.5 h-2.5" />
-                                    </button>
-                                    <div className={`absolute top-full left-0 pt-2 hidden group-hover:block z-[40]`}>
-                                      <div className={`p-2 rounded-2xl shadow-2xl border min-w-[180px] ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-100 text-gray-900'}`}>
-                                        <div className="flex gap-1 justify-center flex-wrap">
-                                          {[
-                                            { id: 'bullet', type: 'disc', name: 'Dot' },
-                                            { id: 'circle', type: 'circle', name: 'Circle' },
-                                            { id: 'square', type: 'square', name: 'Square' }
-                                          ].map(item => (
+                                  {activeDropdown === 'style' && (
+                                    <div className="absolute top-full left-0 pt-2 z-[50]">
+                                      <div className={`p-1.5 rounded-2xl shadow-2xl border min-w-[200px] ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'}`}>
+                                        {[
+                                          { id: 'p', label: 'Paragraph', className: 'text-sm font-normal' },
+                                          { id: 'h1', label: 'Heading 1', className: 'text-xl font-black' },
+                                          { id: 'h2', label: 'Heading 2', className: 'text-lg font-extrabold' },
+                                          { id: 'h3', label: 'Heading 3', className: 'text-base font-bold' },
+                                          { id: 'h4', label: 'Heading 4', className: 'text-sm font-semibold uppercase tracking-wider' },
+                                          { id: 'h5', label: 'Heading 5', className: 'text-sm font-semibold underline' },
+                                          { id: 'h6', label: 'Heading 6', className: 'text-xs font-semibold italic' },
+                                          { id: 'pre', label: 'Preformatted', className: 'text-xs font-mono bg-slate-100 dark:bg-slate-800 p-1' }
+                                        ].map(item => (
                                             <button 
-                                              key={item.id} 
-                                              onClick={() => insertFormat('list', item.id)} 
-                                              className="p-3 hover:bg-blue-500/10 rounded-xl flex flex-col items-center gap-3 transition-all min-w-[70px]"
-                                            >
-                                              <div className="space-y-1.5 w-full flex flex-col items-center">
-                                                {[1, 2, 3].map(i => (
-                                                  <div key={i} className="flex items-center gap-2 w-full justify-center">
-                                                    <div className={`w-1.5 h-1.5 shrink-0 ${
-                                                      item.type === 'disc' ? 'bg-blue-500 rounded-full' :
-                                                      item.type === 'circle' ? 'border-2 border-blue-500 rounded-full' :
-                                                      'bg-blue-500'
-                                                    }`} />
-                                                    <div className="w-8 h-1 bg-slate-200 dark:bg-slate-700 rounded-full" />
-                                                  </div>
-                                                ))}
-                                              </div>
-                                              <span className="text-[10px] font-bold opacity-60 uppercase">{item.name}</span>
-                                            </button>
-                                          ))}
-                                        </div>
+                                            key={item.id}
+                                            onClick={() => {
+                                              if (item.id === 'p') insertFormat('header', false);
+                                              else if (item.id === 'pre') insertFormat('code-block');
+                                              else insertFormat('header', parseInt(item.id.replace('h', '')));
+                                              setActiveDropdown(null);
+                                            }}
+                                            className={`w-full text-left px-3.5 py-2 rounded-xl transition-all ${isDarkMode ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'}`}
+                                          >
+                                            <div className={item.className}>{item.label}</div>
+                                          </button>
+                                        ))}
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="relative group">
-                                    <button className={`p-2 rounded-lg hover:bg-blue-500/10 flex items-center gap-1 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                                      <ListOrdered className="w-4 h-4" /><ChevronDown className="w-2.5 h-2.5" />
+                                  )}
+                                </div>
+
+                                <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-0.5" />
+                                
+                                <div className="flex items-center gap-0">
+                                  <button onClick={() => insertFormat('bold')} title="Bold" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Bold className="w-4 h-4" /></button>
+                                  <button onClick={() => insertFormat('italic')} title="Italic" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Italic className="w-4 h-4" /></button>
+                                </div>
+                                
+                                <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-0.5" />
+                                
+                                <div className="flex items-center gap-0">
+                                  <button onClick={() => insertFormat('align', '')} title="Align Left" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignLeft className="w-4 h-4" /></button>
+                                  <button onClick={() => insertFormat('align', 'center')} title="Align Center" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignCenter className="w-4 h-4" /></button>
+                                  <button onClick={() => insertFormat('align', 'right')} title="Align Right" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignRight className="w-4 h-4" /></button>
+                                  <button onClick={() => insertFormat('align', 'justify')} title="Justify" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignJustify className="w-4 h-4" /></button>
+                                </div>
+
+                                <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-0.5" />
+
+                                <div className="flex items-center gap-0">
+                                  <button onClick={() => insertFormat('indent', '-1')} title="Decrease Indent" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Outdent className="w-4 h-4" /></button>
+                                  <button onClick={() => insertFormat('indent', '+1')} title="Increase Indent" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Indent className="w-4 h-4" /></button>
+                                </div>
+
+                                <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-0.5" />
+
+                                <div className="flex items-center gap-0">
+                                  <div className="relative">
+                                    <button 
+                                      onClick={() => setActiveDropdown(activeDropdown === 'list' ? null : 'list')}
+                                      className={`p-1.5 rounded-lg hover:bg-blue-500/10 flex items-center gap-0.5 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}
+                                    >
+                                      <ListIcon className="w-4 h-4" /><ChevronDown className={`w-2.5 h-2.5 transition-transform ${activeDropdown === 'list' ? 'rotate-180' : ''}`} />
                                     </button>
-                                    <div className={`absolute top-full left-0 pt-2 hidden group-hover:block z-[40]`}>
-                                      <div className={`p-3 rounded-2xl shadow-2xl border min-w-[200px] ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'}`}>
-                                        <div className="grid grid-cols-2 gap-2">
-                                          {[
-                                            { id: 'ordered', label: '1.', sub: 'Number' },
-                                            { id: 'lower-alpha', label: 'a.', sub: 'alpha' },
-                                            { id: 'upper-alpha', label: 'A.', sub: 'ALPHA' },
-                                            { id: 'lower-roman', label: 'i.', sub: 'roman' },
-                                            { id: 'upper-roman', label: 'I.', sub: 'ROMAN' }
-                                          ].map(item => (
-                                            <button 
-                                              key={item.id} 
-                                              onClick={() => insertFormat('list', item.id)} 
-                                              className={`p-2 hover:bg-blue-500/10 rounded-xl flex flex-col items-center gap-2 transition-all border ${isDarkMode ? 'border-slate-800' : 'border-gray-50'}`}
-                                            >
-                                              <div className="flex flex-col items-center gap-1 w-full">
-                                                {[1, 2].map(i => (
-                                                  <div key={i} className="flex items-center gap-1.5 w-full justify-center">
-                                                    <span className={`text-[8px] font-black w-3 text-right tabular-nums ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`}>
-                                                      {i === 1 ? item.label : (item.label.replace('1', '2').replace('a', 'b').replace('i', 'ii').replace('A', 'B').replace('I', 'II'))}
-                                                    </span>
-                                                    <div className="w-6 h-0.5 bg-slate-200 dark:bg-slate-800 rounded-full shrink-0" />
-                                                  </div>
-                                                ))}
-                                              </div>
-                                              <span className="text-[9px] font-bold opacity-50 tracking-tighter truncate w-full text-center">{item.sub}</span>
-                                            </button>
-                                          ))}
+                                    {activeDropdown === 'list' && (
+                                      <div className="absolute top-full left-0 pt-2 z-[40]">
+                                        <div className={`p-1.5 rounded-2xl shadow-2xl border min-w-[170px] ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-100 text-gray-900'}`}>
+                                          <div className="flex gap-0.5 justify-center flex-wrap">
+                                            {[
+                                              { id: 'bullet', type: 'disc', name: 'Dot' },
+                                              { id: 'circle', type: 'circle', name: 'Circle' },
+                                              { id: 'square', type: 'square', name: 'Square' }
+                                            ].map(item => (
+                                              <button 
+                                                key={item.id} 
+                                                onClick={() => { insertFormat('list', item.id); setActiveDropdown(null); }} 
+                                                className="p-2.5 hover:bg-blue-500/10 rounded-xl flex flex-col items-center gap-2.5 transition-all min-w-[65px]"
+                                              >
+                                                <div className="space-y-1.5 w-full flex flex-col items-center">
+                                                  {[1, 2, 3].map(i => (
+                                                    <div key={i} className="flex items-center gap-1.5 w-full justify-center">
+                                                      <div className={`w-1 h-1 shrink-0 ${
+                                                        item.type === 'disc' ? 'bg-blue-500 rounded-full' :
+                                                        item.type === 'circle' ? 'border-2 border-blue-500 rounded-full' :
+                                                        'bg-blue-500'
+                                                      }`} />
+                                                      <div className="w-7 h-0.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                                <span className="text-[9px] font-bold opacity-60 uppercase">{item.name}</span>
+                                              </button>
+                                            ))}
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
+                                    )}
+                                  </div>
+                                  <div className="relative">
+                                    <button 
+                                      onClick={() => setActiveDropdown(activeDropdown === 'ordered' ? null : 'ordered')}
+                                      className={`p-1.5 rounded-lg hover:bg-blue-500/10 flex items-center gap-0.5 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}
+                                    >
+                                      <ListOrdered className="w-4 h-4" /><ChevronDown className={`w-2.5 h-2.5 transition-transform ${activeDropdown === 'ordered' ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {activeDropdown === 'ordered' && (
+                                      <div className="absolute top-full left-0 pt-2 z-[40]">
+                                        <div className={`p-2.5 rounded-2xl shadow-2xl border min-w-[190px] ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'}`}>
+                                          <div className="grid grid-cols-2 gap-1.5">
+                                            {[
+                                              { id: 'ordered', label: '1.', sub: 'Number' },
+                                              { id: 'lower-alpha', label: 'a.', sub: 'alpha' },
+                                              { id: 'upper-alpha', label: 'A.', sub: 'ALPHA' },
+                                              { id: 'lower-roman', label: 'i.', sub: 'roman' },
+                                              { id: 'upper-roman', label: 'I.', sub: 'ROMAN' }
+                                            ].map(item => (
+                                              <button 
+                                                key={item.id} 
+                                                onClick={() => { insertFormat('list', item.id); setActiveDropdown(null); }} 
+                                                className={`p-1.5 hover:bg-blue-500/10 rounded-xl flex flex-col items-center gap-1.5 transition-all border ${isDarkMode ? 'border-slate-800' : 'border-gray-50'}`}
+                                              >
+                                                <div className="flex flex-col items-center gap-0.5 w-full">
+                                                  {[1, 2].map(i => (
+                                                    <div key={i} className="flex items-center gap-1 w-full justify-center">
+                                                      <span className={`text-[7px] font-black w-2.5 text-right tabular-nums ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`}>
+                                                        {i === 1 ? item.label : (item.label.replace('1', '2').replace('a', 'b').replace('i', 'ii').replace('A', 'B').replace('I', 'II'))}
+                                                      </span>
+                                                      <div className="w-5 h-0.5 bg-slate-200 dark:bg-slate-800 rounded-full shrink-0" />
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                                <span className="text-[8px] font-bold opacity-50 tracking-tighter truncate w-full text-center">{item.sub}</span>
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 
-                                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1" />
-
-                                <div className="flex items-center gap-1">
-                                  <button onClick={() => setShowLinkDialog(true)} title="Link" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Link className="w-4 h-4" /></button>
-                                  <button onClick={() => setShowEmojiDialog(true)} title="Emoji" className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Smile className="w-4 h-4" /></button>
+                                <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-0.5" />
+                                
+                                <div className="flex items-center gap-0">
+                                  <button onClick={() => setShowLinkDialog(true)} title="Link" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Link className="w-4 h-4" /></button>
+                                  <button onClick={() => setShowEmojiDialog(true)} title="Emoji" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Smile className="w-4 h-4" /></button>
+                                  
                                   <button 
                                     onClick={() => {
                                       const quill = quillRef.current?.getEditor();
@@ -2651,7 +2774,7 @@ export default function App() {
                                       }
                                     }} 
                                     title="Clear Styles" 
-                                    className={`p-2 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}
+                                    className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}
                                   >
                                     <div className="relative">
                                       <Baseline className="w-4 h-4" />
@@ -2670,6 +2793,7 @@ export default function App() {
                                   placeholder="Start typing your content here..."
                                   modules={{
                                     toolbar: false,
+                                    table: true,
                                     history: { delay: 1000, maxStack: 50, userOnly: true }
                                   }}
                                   className={`w-full quill-custom-editor ${isDarkMode ? 'dark-mode-quill' : ''}`}
