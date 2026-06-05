@@ -535,7 +535,7 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[100] overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
+          <div className="flex min-h-full items-center justify-center p-3 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -547,7 +547,7 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-[390px] z-10 overflow-hidden rounded-[24px] border shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
+              className={`w-full max-w-[410px] sm:max-w-[390px] z-10 overflow-hidden rounded-[24px] border shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
                 isDarkMode 
                   ? 'border-white/[0.08] bg-[#0c1220]/95 text-white shadow-black/40' 
                   : 'border-slate-200/60 bg-white/95 text-slate-800 shadow-slate-200/50'
