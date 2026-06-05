@@ -535,73 +535,87 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[100] overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 md:p-6">
+          <div className="flex min-h-full items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onClose}
-              className="fixed inset-0 bg-black/40 backdrop-blur-md"
+              className={`fixed inset-0 backdrop-blur-md transition-all duration-300 ${isDarkMode ? 'bg-black/60' : 'bg-slate-900/30'}`}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-xl z-10 overflow-hidden rounded-3xl shadow-2xl border ${
+              className={`w-full max-w-[390px] z-10 overflow-hidden rounded-[24px] border shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
                 isDarkMode 
-                  ? 'bg-slate-900/90 border-white/10 text-white shadow-black/50' 
-                  : 'bg-white/90 border-slate-200/60 text-slate-900'
-              } backdrop-blur-xl relative`}
-            >
-            <button 
-              onClick={onClose}
-              className={`absolute top-5 right-5 p-2 rounded-full transition-colors z-20 ${
-                isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
+                  ? 'border-white/[0.08] bg-[#0c1220]/95 text-white shadow-black/40' 
+                  : 'border-slate-200/60 bg-white/95 text-slate-800 shadow-slate-200/50'
               }`}
             >
-              <X className="w-5 h-5" />
-            </button>
+              <div className="p-5 md:p-6 space-y-5">
+                {/* Header Section with Original Logo & Subtitle */}
+                <div className={`border-b pb-4 transition-all duration-300 ${isDarkMode ? 'border-slate-800/60' : 'border-slate-100'}`}>
+                  <Logo isDarkMode={isDarkMode} subtitle="Privacy-First PDF Suite" />
+                </div>
 
-            <div className="p-8 md:p-10 space-y-8">
-              <div className="flex flex-col items-center md:items-start">
-                <Logo 
-                  isDarkMode={isDarkMode} 
-                  subtitle="Privacy-First PDF Suite"
-                />
-              </div>
+                {/* Description Section with "About" Header */}
+                <div className="space-y-1.5">
+                  <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] select-none transition-all duration-300 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    About
+                  </h3>
+                  <p className={`text-xs md:text-sm font-medium leading-relaxed transition-all duration-300 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    PDFPilot helps you merge documents, reorganize pages, sanitize metadata, edit custom text, and perform files conversion in a single polished local workflow.
+                  </p>
+                </div>
 
-              <p className={`text-lg leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                PDFPilot is a high-performance, browser-based PDF utility suite. We prioritize your data security by performing all operations 100% locally on your machine—your files never touch a server.
-              </p>
+                {/* Core Capabilities Section */}
+                <div className="space-y-3">
+                  <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] select-none transition-all duration-300 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Core Capabilities
+                  </h3>
+                  <div className="space-y-2">
+                    {[
+                      "100% offline local processing",
+                      "Zero-server privacy validation",
+                      "Metadata editing and sanitization",
+                      "Smart merge and page sort operations",
+                      "Instant image and formatted text conversion",
+                      "Ultra-secure browser-based file delivery"
+                    ].map((capability, i) => (
+                      <div key={i} className="flex items-start gap-2.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0 mt-1.5" />
+                        <span className={`text-[13px] font-semibold transition-all duration-300 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {capability}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-              <div className="space-y-4">
-                <h3 className={`text-xs font-black uppercase tracking-[0.2em] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Main Features
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[
-                    { title: 'Local Processing', desc: 'Secure & Offline' },
-                    { title: 'Privacy Focused', desc: 'No data collection' },
-                    { title: 'Merge & Split', desc: 'Organize pages' },
-                    { title: 'Metadata Tools', desc: 'Sanitize & Edit' }
-                  ].map((f, i) => (
-                    <div key={i} className={`p-4 rounded-2xl border transition-colors ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}>
-                      <p className="font-bold text-sm tracking-tight">{f.title}</p>
-                      <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{f.desc}</p>
-                    </div>
-                  ))}
+                {/* Subtle Divider */}
+                <div className={`h-px my-1 transition-all duration-300 ${isDarkMode ? 'bg-slate-800/60' : 'bg-slate-200/60'}`} />
+
+                {/* Footer Section */}
+                <div className="flex items-center justify-between pt-1">
+                  <p className={`text-[11px] md:text-xs font-semibold italic select-none transition-all duration-300 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Crafted for excellence by <span className={`font-black bg-gradient-to-r ${isDarkMode ? 'from-blue-400 to-indigo-400' : 'from-blue-600 via-indigo-600 to-indigo-700'} bg-clip-text text-transparent`}>Sahil Khatkar</span>
+                  </p>
+                  <button 
+                    onClick={onClose}
+                    className={`px-4 py-1.5 md:py-2 rounded-xl border transition-all text-xs font-bold uppercase tracking-wider cursor-pointer ${
+                      isDarkMode 
+                        ? 'bg-[#1e2638] hover:bg-[#242f46] border-white/[0.05] hover:border-white/[0.1] text-slate-200 hover:text-white' 
+                        : 'bg-slate-100 hover:bg-slate-200 border-slate-200/50 hover:border-slate-300/50 text-slate-700 hover:text-slate-900'
+                    }`}
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
-
-              <div className="pt-8 border-t border-slate-200 dark:border-white/10 text-center">
-                <p className={`text-sm italic ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                  Crafted for excellence by <span className="font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Sahil Khatkar</span>
-                </p>
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </div>
-      </div>
       )}
     </AnimatePresence>
   );
@@ -1336,7 +1350,8 @@ export default function App() {
                 const cells = Array.from(row.querySelectorAll('td, th'));
                 let maxCellLines = 0;
                 const cellContents = cells.map(cell => {
-                  const lines = splitText(cell.innerText || cell.textContent || '', font, fontSize - 2, colWidth - 10);
+                  const htmlCell = cell as HTMLElement;
+                  const lines = splitText(htmlCell.innerText || htmlCell.textContent || '', font, fontSize - 2, colWidth - 10);
                   if (lines.length > maxCellLines) maxCellLines = lines.length;
                   return lines;
                 });
@@ -1737,6 +1752,7 @@ export default function App() {
             let text = '';
             if (numberFormat === 'simple') text = `${displayNum}`;
             else if (numberFormat === 'fraction') text = `${displayNum}/${pages.length}`;
+            else if (numberFormat === 'page-n') text = `Page ${displayNum}`;
             else if (numberFormat === 'full') text = `Page ${displayNum} of ${pages.length}`;
             else if (numberFormat === 'roman-upper') text = toRoman(displayNum);
             else if (numberFormat === 'roman-lower') text = toRoman(displayNum).toLowerCase();
@@ -3642,6 +3658,7 @@ export default function App() {
                                 {[
                                   { id: 'simple', label: '1 (Just number)' },
                                   { id: 'fraction', label: '1/5 (Fraction)' },
+                                  { id: 'page-n', label: 'Page 1' },
                                   { id: 'full', label: 'Page 1 of 5 (Full text)' },
                                   { id: 'roman-upper', label: 'I, II, III (Roman Uppercase)' },
                                   { id: 'roman-lower', label: 'i, ii, iii (Roman Lowercase)' },
