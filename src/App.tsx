@@ -547,13 +547,13 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-[480px] sm:max-w-[460px] z-10 overflow-hidden rounded-[24px] border shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
+              className={`w-full max-w-[410px] sm:max-w-[390px] lg:max-w-[440px] z-10 overflow-hidden rounded-[24px] border shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
                 isDarkMode 
                   ? 'border-white/[0.08] bg-[#0c1220]/95 text-white shadow-black/40' 
                   : 'border-slate-200/60 bg-white/95 text-slate-800 shadow-slate-200/50'
               }`}
             >
-              <div className="p-5 md:p-6 space-y-5">
+              <div className="px-5 py-6 md:px-6 md:py-7 space-y-6">
                 {/* Header Section with Original Logo & Subtitle */}
                 <div className={`border-b pb-4 transition-all duration-300 ${isDarkMode ? 'border-slate-800/60' : 'border-slate-100'}`}>
                   <Logo isDarkMode={isDarkMode} subtitle="Privacy-First PDF Suite" />
