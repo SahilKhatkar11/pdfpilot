@@ -547,7 +547,7 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`w-full max-w-[410px] sm:max-w-[390px] z-10 overflow-hidden rounded-[24px] border shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
+              className={`w-full max-w-[480px] sm:max-w-[460px] z-10 overflow-hidden rounded-[24px] border shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
                 isDarkMode 
                   ? 'border-white/[0.08] bg-[#0c1220]/95 text-white shadow-black/40' 
                   : 'border-slate-200/60 bg-white/95 text-slate-800 shadow-slate-200/50'
@@ -598,7 +598,7 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
 
                 {/* Footer Section */}
                 <div className="flex items-center justify-between pt-1">
-                  <p className={`text-[11px] md:text-xs font-semibold italic select-none transition-all duration-300 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <p className={`text-xs md:text-sm font-semibold italic select-none transition-all duration-300 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                     Crafted for excellence by <span className={`font-black bg-gradient-to-r ${isDarkMode ? 'from-blue-400 to-indigo-400' : 'from-blue-600 via-indigo-600 to-indigo-700'} bg-clip-text text-transparent`}>Sahil Khatkar</span>
                   </p>
                   <button 
@@ -818,6 +818,7 @@ export default function App() {
   const quillRef = useRef<ReactQuill>(null);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
+  const [activeFormats, setActiveFormats] = useState<any>({});
   const textFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -1013,8 +1014,31 @@ export default function App() {
     // Always focus the editor first to ensure selection is active
     quill.focus();
     
-    // If no selection, focus will restore it or we can just apply format
-    quill.format(format, value);
+    const range = quill.getSelection();
+    const currentFormats = range ? quill.getFormat(range) : quill.getFormat();
+    
+    let formatValue = value;
+    if (format === 'bold' || format === 'italic') {
+      formatValue = !currentFormats[format];
+    } else if (format === 'align') {
+      if (currentFormats.align === value) {
+        formatValue = false;
+      }
+    } else if (format === 'list') {
+      if (currentFormats.list === value) {
+        formatValue = false;
+      }
+    }
+    
+    quill.format(format, formatValue);
+
+    // Sync active formats immediately
+    const nextRange = quill.getSelection();
+    if (nextRange) {
+      setActiveFormats(quill.getFormat(nextRange));
+    } else {
+      setActiveFormats(quill.getFormat());
+    }
   }, []);
 
   const undo = () => {
@@ -1495,6 +1519,39 @@ export default function App() {
               }
             };
 
+            let topMargin = 0;
+            let bottomMargin = 5;
+
+            if (tag.startsWith('h')) {
+              const level = parseInt(tag.substring(1));
+              topMargin = Math.max(16, 28 - level * 3);
+              // Cleanly match the line spacing of two standard paragraph lines by reducing the bottomMargin offset
+              if (level === 1) bottomMargin = -14;
+              else if (level === 2) bottomMargin = -11;
+              else if (level === 3) bottomMargin = -9;
+              else if (level === 4) bottomMargin = -7;
+              else if (level === 5) bottomMargin = -5;
+              else bottomMargin = -3;
+            } else if (tag === 'ul' || tag === 'ol') {
+              topMargin = 10;
+              bottomMargin = 8;
+            } else if (tag === 'pre') {
+              topMargin = 8;
+              bottomMargin = 8;
+            }
+
+            if (topMargin > 0) {
+              const estimatedSpaceNeeded = topMargin + currentFontSize * 2.5;
+              if (currentY - estimatedSpaceNeeded < margin) {
+                currentPage = pdfDoc.addPage([595.28, 841.89]);
+                currentY = height - margin;
+              } else {
+                if (currentY !== height - margin) {
+                  currentY -= topMargin;
+                }
+              }
+            }
+
             if (isList) {
               const detectedListStyle = el.getAttribute('data-list');
               const items = Array.from(el.children) as HTMLElement[];
@@ -1504,7 +1561,7 @@ export default function App() {
             } else {
               processElement(el, xOffset, currentFont, currentFontSize);
             }
-            currentY -= 5;
+            currentY -= bottomMargin;
           }
         }
         
@@ -2622,10 +2679,22 @@ export default function App() {
                                 <div className="relative">
                                   <button 
                                     onClick={() => setActiveDropdown(activeDropdown === 'style' ? null : 'style')}
-                                    className={`px-2.5 py-1.5 rounded-lg border text-[13px] font-semibold outline-none flex items-center gap-1.5 transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                                    className={`px-2.5 py-1.5 rounded-lg border text-[13px] font-semibold outline-none flex items-center gap-1.5 transition-all ${
+                                      (activeFormats['code-block'] || activeFormats.header)
+                                        ? 'bg-blue-500/15 border-blue-500/30 text-blue-500'
+                                        : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                    }`}
                                   >
-                                    <Type className="w-3.5 h-3.5" />
-                                    <span>Style</span>
+                                    <Type className="w-3.5 h-3.5 shrink-0" />
+                                    <span>
+                                      {activeFormats['code-block'] ? 'Preformatted' :
+                                       activeFormats.header === 1 ? 'Heading 1' :
+                                       activeFormats.header === 2 ? 'Heading 2' :
+                                       activeFormats.header === 3 ? 'Heading 3' :
+                                       activeFormats.header === 4 ? 'Heading 4' :
+                                       activeFormats.header === 5 ? 'Heading 5' :
+                                       activeFormats.header === 6 ? 'Heading 6' : 'Paragraph'}
+                                    </span>
                                     <ChevronDown className={`w-3 h-3 opacity-50 transition-transform ${activeDropdown === 'style' ? 'rotate-180' : ''}`} />
                                   </button>
                                   {activeDropdown === 'style' && (
@@ -2640,20 +2709,35 @@ export default function App() {
                                           { id: 'h5', label: 'Heading 5', className: 'text-sm font-semibold underline' },
                                           { id: 'h6', label: 'Heading 6', className: 'text-xs font-semibold italic' },
                                           { id: 'pre', label: 'Preformatted', className: 'text-xs font-mono bg-slate-100 dark:bg-slate-800 p-1' }
-                                        ].map(item => (
+                                        ].map(item => {
+                                          const isActiveStyle = 
+                                            (item.id === 'p' && !activeFormats.header && !activeFormats['code-block']) ||
+                                            (item.id === 'pre' && activeFormats['code-block']) ||
+                                            (item.id.startsWith('h') && activeFormats.header === parseInt(item.id.replace('h', '')));
+
+                                          return (
                                             <button 
-                                            key={item.id}
-                                            onClick={() => {
-                                              if (item.id === 'p') insertFormat('header', false);
-                                              else if (item.id === 'pre') insertFormat('code-block');
-                                              else insertFormat('header', parseInt(item.id.replace('h', '')));
-                                              setActiveDropdown(null);
-                                            }}
-                                            className={`w-full text-left px-3.5 py-2 rounded-xl transition-all ${isDarkMode ? 'text-slate-300 hover:bg-slate-800 hover:text-white' : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'}`}
-                                          >
-                                            <div className={item.className}>{item.label}</div>
-                                          </button>
-                                        ))}
+                                              key={item.id}
+                                              onClick={() => {
+                                                if (item.id === 'p') insertFormat('header', false);
+                                                else if (item.id === 'pre') insertFormat('code-block');
+                                                else insertFormat('header', parseInt(item.id.replace('h', '')));
+                                                setActiveDropdown(null);
+                                              }}
+                                              className={`w-full text-left px-3.5 py-2 rounded-xl transition-all ${
+                                                isActiveStyle
+                                                  ? isDarkMode 
+                                                    ? 'bg-blue-600/20 text-blue-400 font-bold' 
+                                                    : 'bg-blue-50 text-blue-600 font-bold'
+                                                  : isDarkMode 
+                                                    ? 'text-slate-300 hover:bg-slate-800 hover:text-white' 
+                                                    : 'text-gray-700 hover:bg-blue-50/50 hover:text-blue-500'
+                                              }`}
+                                            >
+                                              <div className={item.className}>{item.label}</div>
+                                            </button>
+                                          );
+                                        })}
                                       </div>
                                     </div>
                                   )}
@@ -2662,17 +2746,77 @@ export default function App() {
                                 <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-0.5" />
                                 
                                 <div className="flex items-center gap-0">
-                                  <button onClick={() => insertFormat('bold')} title="Bold" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Bold className="w-4 h-4" /></button>
-                                  <button onClick={() => insertFormat('italic')} title="Italic" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><Italic className="w-4 h-4" /></button>
+                                  <button 
+                                    onClick={() => insertFormat('bold')} 
+                                    title="Bold" 
+                                    className={`p-1.5 rounded-lg transition-all ${
+                                      activeFormats.bold 
+                                        ? 'bg-blue-500/20 text-blue-500 font-bold scale-105' 
+                                        : `hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`
+                                    }`}
+                                  >
+                                    <Bold className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => insertFormat('italic')} 
+                                    title="Italic" 
+                                    className={`p-1.5 rounded-lg transition-all ${
+                                      activeFormats.italic 
+                                        ? 'bg-blue-500/20 text-blue-500 font-bold scale-105' 
+                                        : `hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`
+                                    }`}
+                                  >
+                                    <Italic className="w-4 h-4" />
+                                  </button>
                                 </div>
                                 
                                 <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-0.5" />
                                 
                                 <div className="flex items-center gap-0">
-                                  <button onClick={() => insertFormat('align', '')} title="Align Left" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignLeft className="w-4 h-4" /></button>
-                                  <button onClick={() => insertFormat('align', 'center')} title="Align Center" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignCenter className="w-4 h-4" /></button>
-                                  <button onClick={() => insertFormat('align', 'right')} title="Align Right" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignRight className="w-4 h-4" /></button>
-                                  <button onClick={() => insertFormat('align', 'justify')} title="Justify" className={`p-1.5 rounded-lg hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}><AlignJustify className="w-4 h-4" /></button>
+                                  <button 
+                                    onClick={() => insertFormat('align', '')} 
+                                    title="Align Left" 
+                                    className={`p-1.5 rounded-lg transition-all ${
+                                      (!activeFormats.align || activeFormats.align === '') 
+                                        ? 'bg-blue-500/20 text-blue-500 font-bold' 
+                                        : `hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`
+                                    }`}
+                                  >
+                                    <AlignLeft className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => insertFormat('align', 'center')} 
+                                    title="Align Center" 
+                                    className={`p-1.5 rounded-lg transition-all ${
+                                      activeFormats.align === 'center' 
+                                        ? 'bg-blue-500/20 text-blue-500 font-bold' 
+                                        : `hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`
+                                    }`}
+                                  >
+                                    <AlignCenter className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => insertFormat('align', 'right')} 
+                                    title="Align Right" 
+                                    className={`p-1.5 rounded-lg transition-all ${
+                                      activeFormats.align === 'right' 
+                                        ? 'bg-blue-500/20 text-blue-500 font-bold' 
+                                        : `hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`
+                                    }`}
+                                  >
+                                    <AlignRight className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => insertFormat('align', 'justify')} 
+                                    title="Justify" 
+                                    className={`p-1.5 rounded-lg transition-all ${
+                                      activeFormats.align === 'justify' 
+                                        ? 'bg-blue-500/20 text-blue-500 font-bold' 
+                                        : `hover:bg-blue-500/10 ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`
+                                    }`}
+                                  >
+                                    <AlignJustify className="w-4 h-4" />
+                                  </button>
                                 </div>
 
                                 <div className="w-px h-4 bg-gray-200 dark:bg-slate-800 mx-0.5" />
@@ -2786,6 +2930,7 @@ export default function App() {
                                           quill.format('header', false);
                                           quill.format('code-block', false);
                                           quill.format('align', false);
+                                          setActiveFormats({});
                                         }
                                       }
                                     }} 
@@ -2805,7 +2950,26 @@ export default function App() {
                                   ref={quillRef}
                                   theme="snow"
                                   value={text2pdfInput}
-                                  onChange={setText2pdfInput}
+                                  onChange={(content, delta, source, editor) => {
+                                    setText2pdfInput(content);
+                                    const quill = quillRef.current?.getEditor();
+                                    if (quill) {
+                                      const range = quill.getSelection();
+                                      if (range) {
+                                        setActiveFormats(quill.getFormat(range));
+                                      } else {
+                                        setActiveFormats(quill.getFormat());
+                                      }
+                                    }
+                                  }}
+                                  onChangeSelection={(range, source, editor) => {
+                                    const quill = quillRef.current?.getEditor();
+                                    if (quill && range) {
+                                      setActiveFormats(quill.getFormat(range));
+                                    } else if (quill) {
+                                      setActiveFormats(quill.getFormat());
+                                    }
+                                  }}
                                   placeholder="Start typing your content here..."
                                   modules={{
                                     toolbar: false,
