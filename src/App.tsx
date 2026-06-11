@@ -599,7 +599,7 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
                 {/* Footer Section */}
                 <div className="flex items-center justify-between pt-1">
                   <p className={`text-xs md:text-sm font-semibold italic select-none transition-all duration-300 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Crafted for excellence by <span className={`font-black bg-gradient-to-r ${isDarkMode ? 'from-blue-400 to-indigo-400' : 'from-blue-600 via-indigo-600 to-indigo-700'} bg-clip-text text-transparent`}>Sahil Khatkar</span>
+                    Crafted for excellence by <span className={`inline-block px-1 pb-0.5 font-black bg-gradient-to-r ${isDarkMode ? 'from-blue-400 to-indigo-400' : 'from-blue-600 via-indigo-600 to-indigo-700'} bg-clip-text text-transparent`}>Sahil Khatkar</span>
                   </p>
                   <button 
                     onClick={onClose}
@@ -762,8 +762,50 @@ const PdfPreviewModal = ({ isOpen, onClose, url, name, isDarkMode }: { isOpen: b
   );
 };
 
+const TOOL_URL_MAP: Record<string, ToolType> = {
+  'text-to-pdf': 'text2pdf',
+  'image-to-pdf': 'img2pdf',
+  'pdf-to-image': 'pdf2img',
+  'split-pdf': 'split',
+  'merge-pdf': 'merge',
+  'extract-pages': 'extract',
+  'organize-pdf': 'organize',
+  'page-numbers': 'number',
+  'copy-pages': 'copyPages',
+  'duplicate-pages': 'duplicate',
+  'add-blank-pages': 'blank',
+  'rotate-pdf': 'rotate',
+  'reverse-pdf': 'reverse',
+  'extract-text': 'extractText',
+  'draw-and-sign': 'draw',
+  'watermark-pdf': 'watermark',
+  'draw-images': 'drawImages',
+  'draw-graphics': 'drawVectors',
+  'add-attachments': 'addAttachments',
+  'grayscale-pdf': 'grayscale',
+  'flatten-pdf': 'flatten',
+  'sanitize-pdf': 'sanitize',
+  'viewer-preferences': 'viewerPreferences',
+  'manage-metadata': 'metadata',
+};
+
+const TOOL_ID_TO_URL = Object.fromEntries(
+  Object.entries(TOOL_URL_MAP).map(([url, id]) => [id, url])
+) as Record<ToolType, string>;
+
 export default function App() {
-  const [activeTool, setActiveTool] = useState<ToolType | null>(null);
+  const [activeTool, setActiveTool] = useState<ToolType | null>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      const cleanHash = hash.replace(/^#\/?/, '').toLowerCase();
+      if (TOOL_URL_MAP[cleanHash]) {
+        return TOOL_URL_MAP[cleanHash];
+      }
+      const found = TOOLS.find(t => t.id === cleanHash);
+      return found ? (found.id as ToolType) : null;
+    }
+    return null;
+  });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [files, setFiles] = useState<PDFFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -2313,6 +2355,44 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const isInternalNavigationRef = useRef(false);
+
+  const navigateTo = (toolId: ToolType | null) => {
+    setIsMenuOpen(false);
+    if (toolId) {
+      const urlPath = TOOL_ID_TO_URL[toolId] || toolId;
+      window.location.hash = `#/${urlPath}`;
+    } else {
+      window.location.hash = '#/';
+    }
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      const cleanHash = hash.replace(/^#\/?/, '').toLowerCase();
+      let toolId: ToolType | null = null;
+      
+      if (TOOL_URL_MAP[cleanHash]) {
+        toolId = TOOL_URL_MAP[cleanHash];
+      } else {
+        const found = TOOLS.find(t => t.id === cleanHash || t.id.toLowerCase() === cleanHash);
+        toolId = found ? (found.id as ToolType) : null;
+      }
+      
+      if (!isInternalNavigationRef.current) {
+        clearFiles();
+      }
+      isInternalNavigationRef.current = false;
+      setActiveTool(toolId);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
+
   const continueWithTool = (result: SplitResult, toolId: ToolType) => {
     const file = new File([result.blob], result.name, { type: result.blob.type });
     const id = Math.random().toString(36).substring(2, 9) + Date.now();
@@ -2320,7 +2400,8 @@ export default function App() {
     if (result.pageCount) {
       setFilePageCounts(prev => ({ ...prev, [id]: result.pageCount }));
     }
-    setActiveTool(toolId);
+    isInternalNavigationRef.current = true;
+    navigateTo(toolId);
     setResults([]);
     setError(null);
     if (toolId === 'organize') {
@@ -2362,12 +2443,12 @@ export default function App() {
               className={`fixed left-0 top-0 bottom-0 w-72 z-50 shadow-2xl p-6 flex flex-col transition-colors duration-300 ${isDarkMode ? 'bg-slate-900 border-r border-slate-800' : 'bg-white border-r border-gray-100'}`}
             >
               <div className="mb-10">
-                <Logo isDarkMode={isDarkMode} />
+                <Logo isDarkMode={isDarkMode} onClick={() => navigateTo(null)} />
               </div>
 
               <nav className="flex-grow space-y-1 overflow-y-auto pr-2 custom-scrollbar">
                 <button 
-                  onClick={() => { setActiveTool(null); setIsMenuOpen(false); clearFiles(); }}
+                  onClick={() => navigateTo(null)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${!activeTool ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
                 >
                   <Home className="w-5 h-5" />
@@ -2377,7 +2458,7 @@ export default function App() {
                 {TOOLS.map(tool => (
                   <button 
                     key={tool.id}
-                    onClick={() => { setActiveTool(tool.id); setIsMenuOpen(false); clearFiles(); }}
+                    onClick={() => navigateTo(tool.id)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTool === tool.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
                   >
                     <tool.icon className="w-5 h-5" />
@@ -2403,8 +2484,8 @@ export default function App() {
       <div className="flex-grow relative z-10 flex flex-col">
         {/* Sticky Header */}
         <header className={`sticky top-0 z-30 w-full transition-all duration-300 ${
-          isDarkMode ? 'bg-[#0c142e]/85 border-blue-900/20' : 'bg-blue-50/80 border-blue-100/50'
-        } backdrop-blur-md border-b`}>
+          isDarkMode ? 'bg-[#0c142e]/75 border-blue-900/20 backdrop-blur-lg' : 'bg-blue-50/80 border-blue-100/50 backdrop-blur-md'
+        } border-b`}>
           <div className="max-w-5xl mx-auto px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
             <div className="flex items-center gap-3 md:gap-4">
               {activeTool && (
@@ -2418,7 +2499,13 @@ export default function App() {
               <Logo 
                 isDarkMode={isDarkMode} 
                 className="scale-85 md:scale-100 origin-left" 
-                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                onClick={() => {
+                  if (window.scrollY > 20) {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  } else {
+                    navigateTo(null);
+                  }
+                }}
               />
             </div>
 
@@ -2578,7 +2665,7 @@ export default function App() {
                         delay: highlightedTool === tool.id ? 0 : 0.1 * idx,
                         boxShadow: { duration: 0.3 }
                       }}
-                      onClick={() => setActiveTool(tool.id)}
+                      onClick={() => navigateTo(tool.id)}
                       className={`group p-4 pb-2 md:p-6 md:pb-4 rounded-2xl md:rounded-[2rem] border text-left transition-all duration-500 ${
                         highlightedTool === tool.id 
                           ? (isDarkMode ? 'border-blue-500 bg-slate-800/80' : 'border-blue-400 bg-blue-50/30')
@@ -2607,7 +2694,7 @@ export default function App() {
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3 md:gap-4">
                       <button 
-                        onClick={() => setActiveTool(null)}
+                        onClick={() => navigateTo(null)}
                         className={`p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-gray-100 text-gray-500'}`}
                       >
                         <Home className="w-5 h-5" />
@@ -2957,8 +3044,6 @@ export default function App() {
                                       const range = quill.getSelection();
                                       if (range) {
                                         setActiveFormats(quill.getFormat(range));
-                                      } else {
-                                        setActiveFormats(quill.getFormat());
                                       }
                                     }
                                   }}
@@ -2966,8 +3051,6 @@ export default function App() {
                                     const quill = quillRef.current?.getEditor();
                                     if (quill && range) {
                                       setActiveFormats(quill.getFormat(range));
-                                    } else if (quill) {
-                                      setActiveFormats(quill.getFormat());
                                     }
                                   }}
                                   placeholder="Start typing your content here..."
@@ -4203,8 +4286,23 @@ export default function App() {
                                       type="text" 
                                       value={newName} 
                                       onChange={(e) => setNewName(e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onMouseDown={(e) => e.stopPropagation()}
+                                      onMouseUp={(e) => e.stopPropagation()}
                                       className={`w-full p-1 px-2 rounded border outline-none text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                                      autoFocus
+                                      ref={(el) => {
+                                        if (el && document.activeElement !== el) {
+                                          el.focus();
+                                          const val = el.value || '';
+                                          const lastDot = val.lastIndexOf('.');
+                                          const pos = lastDot !== -1 ? lastDot : val.length;
+                                          setTimeout(() => {
+                                            if (document.activeElement === el) {
+                                              el.setSelectionRange(pos, pos);
+                                            }
+                                          }, 20);
+                                        }
+                                      }}
                                     />
                                     <motion.button 
                                       whileTap={{ scale: 0.9 }}
@@ -4230,7 +4328,13 @@ export default function App() {
                             <div className="flex items-center gap-1.5 md:gap-2">
                               <motion.button 
                                 whileTap={{ scale: 0.9 }}
-                                onClick={() => {
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
                                   setRenamingId(i);
                                   setNewName(r.name);
                                 }}
