@@ -531,6 +531,20 @@ const SlickNumberInput = ({
 };
 
 const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: () => void; isDarkMode: boolean }) => {
+  const [waves, setWaves] = useState<{ id: number; x: number; y: number }[]>([]);
+
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const newWave = {
+      id: Date.now() + Math.random(),
+      x,
+      y
+    };
+    setWaves((prev) => [...prev, newWave]);
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -599,7 +613,79 @@ const InfoModal = ({ isOpen, onClose, isDarkMode }: { isOpen: boolean; onClose: 
                 {/* Footer Section */}
                 <div className="flex items-center justify-between pt-1">
                   <p className={`text-xs md:text-sm font-semibold italic select-none transition-all duration-300 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Crafted for excellence by <span className={`inline-block px-1 pb-0.5 font-black bg-gradient-to-r ${isDarkMode ? 'from-blue-400 to-indigo-400' : 'from-blue-600 via-indigo-600 to-indigo-700'} bg-clip-text text-transparent`}>Sahil Khatkar</span>
+                    Crafted for excellence by{' '}
+                    <a
+                      href="https://github.com/sahilkhatkar11"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={handleLinkClick}
+                      className="relative overflow-hidden inline-flex items-baseline cursor-pointer group pb-[3px]"
+                      style={{
+                        display: 'inline-flex',
+                        verticalAlign: 'baseline',
+                        alignItems: 'baseline',
+                        position: 'relative',
+                        top: '1px',
+                      }}
+                    >
+                      <span className={`inline pr-0.5 font-black bg-gradient-to-r ${isDarkMode ? 'from-blue-400 to-indigo-400 hover:from-blue-300 hover:to-indigo-300' : 'from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-600'} bg-clip-text text-transparent`}>Sahil Khatkar</span>
+                      <span className={`absolute left-0 bottom-0 w-full h-[2px] scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300 bg-gradient-to-r ${isDarkMode ? 'from-blue-400 to-indigo-400 group-hover:from-blue-300 group-hover:to-indigo-300' : 'from-blue-600 via-indigo-600 to-indigo-700 group-hover:from-blue-500 group-hover:via-indigo-500 group-hover:to-indigo-600'}`} />
+                      {waves.map((wave) => (
+                        <React.Fragment key={wave.id}>
+                          {/* Outer expanding droplet ring */}
+                          <motion.span
+                            initial={{ scale: 0, opacity: 0.8, border: `2px solid ${isDarkMode ? '#60a5fa' : '#2563eb'}`, backgroundColor: 'transparent' }}
+                            animate={{ scale: 8, opacity: 0 }}
+                            transition={{ duration: 1.0, ease: "easeOut" }}
+                            onAnimationComplete={() => {
+                              setWaves((prev) => prev.filter((w) => w.id !== wave.id));
+                            }}
+                            style={{
+                              position: 'absolute',
+                              left: wave.x,
+                              top: wave.y,
+                              width: '12px',
+                              height: '12px',
+                              borderRadius: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                          {/* Staggered secondary ring */}
+                          <motion.span
+                            initial={{ scale: 0, opacity: 0.5, border: `1px solid ${isDarkMode ? '#3b82f6' : '#1d4ed8'}`, backgroundColor: 'transparent' }}
+                            animate={{ scale: 5.5, opacity: 0 }}
+                            transition={{ duration: 1.0, delay: 0.15, ease: "easeOut" }}
+                            style={{
+                              position: 'absolute',
+                              left: wave.x,
+                              top: wave.y,
+                              width: '12px',
+                              height: '12px',
+                              borderRadius: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                          {/* Inner droplet wave core */}
+                          <motion.span
+                            initial={{ scale: 0, opacity: 0.3, backgroundColor: isDarkMode ? 'rgba(96, 165, 250, 0.4)' : 'rgba(37, 99, 235, 0.3)' }}
+                            animate={{ scale: 4, opacity: 0 }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            style={{
+                              position: 'absolute',
+                              left: wave.x,
+                              top: wave.y,
+                              width: '15px',
+                              height: '15px',
+                              borderRadius: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                        </React.Fragment>
+                      ))}
+                    </a>
                   </p>
                   <button 
                     onClick={onClose}
@@ -828,6 +914,7 @@ export default function App() {
   const [numberFormat, setNumberFormat] = useState<string>('fraction');
   const [numberStartPageIndex, setNumberStartPageIndex] = useState<number>(1);
   const [numberStartValue, setNumberStartValue] = useState<number>(1);
+  const [numberMargin, setNumberMargin] = useState<string>('current');
   
   // New tool states
   const [imgResolution, setImgResolution] = useState<150 | 300>(150);
@@ -1861,11 +1948,26 @@ export default function App() {
             const textWidth = font.widthOfTextAtSize(text, 10);
             
             // Visual coordinates
+            let vy = 25;
+            let sideMargin = 40;
+
+            if (numberMargin === 'recommended') {
+              vy = numberVPosition === 'bottom' ? 36 : height - 36;
+              sideMargin = 36;
+            } else if (numberMargin === 'comfortable') {
+              vy = numberVPosition === 'bottom' ? 48 : height - 48;
+              sideMargin = 48;
+            } else if (numberMargin === 'tight') {
+              vy = numberVPosition === 'bottom' ? 24 : height - 24;
+              sideMargin = 24;
+            } else { // 'current' or fallback
+              vy = numberVPosition === 'bottom' ? 25 : height - 35;
+              sideMargin = 40;
+            }
+
             let vx = width / 2 - textWidth / 2;
-            if (numberPosition === 'left') vx = 40;
-            else if (numberPosition === 'right') vx = width - textWidth - 40;
-            
-            let vy = numberVPosition === 'bottom' ? 25 : height - 35;
+            if (numberPosition === 'left') vx = sideMargin;
+            else if (numberPosition === 'right') vx = width - textWidth - sideMargin;
 
             let drawX, drawY;
             if (rotation === 0) {
@@ -3895,6 +3997,25 @@ export default function App() {
                                     className={`flex-1 py-3 rounded-xl border font-bold capitalize transition-all ${numberPosition === pos ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-gray-200 text-gray-500'}`}
                                   >
                                     {pos}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="space-y-4">
+                              <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Offset from Page Edge</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {[
+                                  { id: 'current', label: 'Default (25/35 pt)' },
+                                  { id: 'recommended', label: 'Recommended (36 pt)' },
+                                  { id: 'comfortable', label: 'Comfortable (48 pt)' },
+                                  { id: 'tight', label: 'Tight (24 pt)' }
+                                ].map(opt => (
+                                  <button
+                                    key={opt.id}
+                                    onClick={() => setNumberMargin(opt.id)}
+                                    className={`py-3 px-3 rounded-xl border font-bold text-xs text-center transition-all ${numberMargin === opt.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-gray-200 text-gray-500'}`}
+                                  >
+                                    {opt.label}
                                   </button>
                                 ))}
                               </div>
