@@ -914,7 +914,7 @@ export default function App() {
   const [numberFormat, setNumberFormat] = useState<string>('fraction');
   const [numberStartPageIndex, setNumberStartPageIndex] = useState<number>(1);
   const [numberStartValue, setNumberStartValue] = useState<number>(1);
-  const [numberMargin, setNumberMargin] = useState<string>('current');
+  const [numberMargin, setNumberMargin] = useState<string>('recommended');
   
   // New tool states
   const [imgResolution, setImgResolution] = useState<150 | 300>(150);
@@ -1191,9 +1191,12 @@ export default function App() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState<string>('');
 
-  // Scroll to top when tool changes
+  // Scroll to top and trigger home feature sheen when returning to homepage
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    if (!activeTool) {
+      setFeatureClickCounts(prev => prev.map(c => c + 1));
+    }
   }, [activeTool]);
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
@@ -2673,6 +2676,13 @@ export default function App() {
                   ].map((feature, i) => (
                     <motion.div
                       key={i}
+                      whileHover={{ 
+                        y: -3, 
+                        scale: 1.02,
+                        boxShadow: isDarkMode 
+                          ? '0 10px 25px -5px rgba(59, 130, 246, 0.12), 0 8px 10px -6px rgba(59, 130, 246, 0.12)' 
+                          : '0 10px 25px -5px rgba(59, 130, 246, 0.06), 0 8px 10px -6px rgba(59, 130, 246, 0.06)'
+                      }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => {
                         const newCounts = [...featureClickCounts];
@@ -2681,8 +2691,8 @@ export default function App() {
                       }}
                       className={`p-4 md:p-5 rounded-2xl border flex flex-col items-center justify-center gap-2 text-center transition-all cursor-pointer relative overflow-hidden ${
                         isDarkMode 
-                          ? 'bg-slate-900/40 border-slate-800 text-slate-300' 
-                          : 'bg-white border-gray-100 text-slate-600 shadow-sm'
+                          ? 'bg-slate-900/40 border-slate-800 text-slate-300 hover:border-slate-700' 
+                          : 'bg-white border-gray-100 text-slate-600 shadow-sm hover:border-blue-100'
                       }`}
                     >
                       <div className="flex flex-col items-center justify-center gap-2 relative z-10">
@@ -2690,16 +2700,16 @@ export default function App() {
                         <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider">{feature.title}</span>
                       </div>
                       
-                      {/* Shiny Polish Effect - One-way Diagonal */}
+                      {/* Shiny Polish Effect - One-way Diagonal Sheen */}
                       <motion.div
                         key={featureClickCounts[i]}
                         initial={{ left: '-150%', top: '150%' }}
-                        animate={featureClickCounts[i] > 0 ? { left: '150%', top: '-150%' } : {}}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
+                        animate={{ left: '150%', top: '-150%' }}
+                        transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
                         className={`absolute w-[200%] h-[200%] pointer-events-none z-20 -rotate-45 ${
                           isDarkMode 
-                            ? 'bg-gradient-to-r from-transparent via-white/10 to-transparent' 
-                            : 'bg-gradient-to-r from-transparent via-blue-400/20 to-transparent'
+                            ? 'bg-gradient-to-r from-transparent via-white/10 via-white/25 via-white/10 to-transparent' 
+                            : 'bg-gradient-to-r from-transparent via-blue-400/20 via-blue-400/35 via-blue-400/20 to-transparent'
                         }`}
                       />
                     </motion.div>
@@ -4003,9 +4013,8 @@ export default function App() {
                             </div>
                             <div className="space-y-4">
                               <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest">Offset from Page Edge</label>
-                              <div className="grid grid-cols-2 gap-2">
+                              <div className="grid grid-cols-3 gap-2">
                                 {[
-                                  { id: 'current', label: 'Default (25/35 pt)' },
                                   { id: 'recommended', label: 'Recommended (36 pt)' },
                                   { id: 'comfortable', label: 'Comfortable (48 pt)' },
                                   { id: 'tight', label: 'Tight (24 pt)' }
@@ -4013,7 +4022,7 @@ export default function App() {
                                   <button
                                     key={opt.id}
                                     onClick={() => setNumberMargin(opt.id)}
-                                    className={`py-3 px-3 rounded-xl border font-bold text-xs text-center transition-all ${numberMargin === opt.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-gray-200 text-gray-500'}`}
+                                    className={`py-3 px-2 rounded-xl border font-bold text-[10px] sm:text-xs text-center transition-all ${numberMargin === opt.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/20' : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-gray-200 text-gray-500'}`}
                                   >
                                     {opt.label}
                                   </button>
