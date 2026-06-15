@@ -2705,7 +2705,7 @@ export default function App() {
                         key={featureClickCounts[i]}
                         initial={{ left: '-150%', top: '150%' }}
                         animate={{ left: '150%', top: '-150%' }}
-                        transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
+                        transition={{ duration: 2.5, ease: [0.2, 0.8, 0.2, 1] }}
                         className={`absolute w-[200%] h-[200%] pointer-events-none z-20 -rotate-45 ${
                           isDarkMode 
                             ? 'bg-gradient-to-r from-transparent via-white/10 via-white/25 via-white/10 to-transparent' 
